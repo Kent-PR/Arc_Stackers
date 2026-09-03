@@ -41,10 +41,11 @@ def _name_font_size(name):
     return max(10, min(size_for_label, size_for_word))
 
 
-def build_cell_grid(groups, names, item_data):
+def build_cell_grid(groups, names, item_data, animate_colors=False):
     """groups: list of {occupant, capacity, fills, cells} from
     core.representations.cell_groups(). Returns a Flet Column containing
-    the item-labelled grid. item_data maps item ids to their raw JSON."""
+    the item-labelled grid and its cells in display order. item_data maps
+    item ids to their raw JSON."""
     color_of = {
         g["occupant"]: RARITY_COLORS.get(
             str(item_data.get(g["occupant"], {}).get("rarity", "")).lower(),
@@ -60,53 +61,72 @@ def build_cell_grid(groups, names, item_data):
             cells.append((g["occupant"], fill, g["capacity"]))
 
     rows = []
+    animated_cells = []
     for row_start in range(0, len(cells), COLUMNS):
         row_cells = cells[row_start:row_start + COLUMNS]
         row_controls = []
         for occupant, fill, capacity in row_cells:
             item_name = names.get(occupant, occupant)
-            row_controls.append(
-                ft.Container(
+            target_color = color_of[occupant]
+            color_layer = ft.Container(
+                width=0 if animate_colors else CELL_SIZE,
+                height=CELL_SIZE,
+                bgcolor=target_color,
+                gradient=ft.LinearGradient(
+                    begin=ft.Alignment.CENTER_LEFT,
+                    end=ft.Alignment.CENTER_RIGHT,
+                    colors=[target_color, target_color, DEFAULT_RARITY_COLOR],
+                    stops=[0, 0.86, 1],
+                ) if animate_colors else None,
+                animate=ft.Animation(400, ft.AnimationCurve.EASE_IN_OUT),
+            )
+            label_layer = ft.Stack(
+                visible=not animate_colors,
+                controls=[
+                    ft.Container(
+                        width=CELL_SIZE,
+                        height=CELL_SIZE,
+                        padding=16,
+                        alignment=ft.Alignment.CENTER,
+                        content=ft.Text(
+                            item_name,
+                            size=_name_font_size(item_name),
+                            weight=ft.FontWeight.BOLD,
+                            text_align=ft.TextAlign.CENTER,
+                            color=ft.Colors.WHITE,
+                            max_lines=4,
+                            overflow=ft.TextOverflow.ELLIPSIS,
+                        ),
+                    ),
+                    ft.Container(
+                        width=CELL_SIZE,
+                        height=CELL_SIZE,
+                        padding=12,
+                        alignment=ft.Alignment.BOTTOM_RIGHT,
+                        content=ft.Text(
+                            f"{fill}/{capacity}",
+                            size=14,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.WHITE,
+                        ),
+                    ),
+                ],
+            )
+            cell = ft.Container(
                     width=CELL_SIZE,
                     height=CELL_SIZE,
-                    bgcolor=color_of[occupant],
+                    bgcolor=DEFAULT_RARITY_COLOR,
                     border_radius=6,
+                    clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                     content=ft.Stack(
-                        [
-                            ft.Container(
-                                width=CELL_SIZE,
-                                height=CELL_SIZE,
-                                padding=16,
-                                alignment=ft.Alignment.CENTER,
-                                content=ft.Text(
-                                    item_name,
-                                    size=_name_font_size(item_name),
-                                    weight=ft.FontWeight.BOLD,
-                                    text_align=ft.TextAlign.CENTER,
-                                    color=ft.Colors.WHITE,
-                                    max_lines=4,
-                                    overflow=ft.TextOverflow.ELLIPSIS,
-                                ),
-                            ),
-                            ft.Container(
-                                width=CELL_SIZE,
-                                height=CELL_SIZE,
-                                padding=12,
-                                alignment=ft.Alignment.BOTTOM_RIGHT,
-                                content=ft.Text(
-                                    f"{fill}/{capacity}",
-                                    size=14,
-                                    weight=ft.FontWeight.BOLD,
-                                    color=ft.Colors.WHITE,
-                                ),
-                            ),
-                        ]
+                        [color_layer, label_layer]
                     ),
                 )
-            )
+            row_controls.append(cell)
+            animated_cells.append((color_layer, label_layer, target_color))
         # pad the last row with empty placeholders so the grid stays 4-wide
         while len(row_controls) < COLUMNS:
             row_controls.append(ft.Container(width=CELL_SIZE, height=CELL_SIZE))
         rows.append(ft.Row(row_controls, spacing=6))
 
-    return ft.Column(rows, spacing=6)
+    return ft.Column(rows, spacing=6), animated_cells
