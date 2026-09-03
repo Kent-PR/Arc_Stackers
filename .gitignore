@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+build/
+*.egg-info/
+
+# Item data is fetched at runtime into an OS cache directory (see
+# core/fetch.py) - it never lives inside this repo, so nothing to ignore
+# here for it specifically. This is just standard Python project hygiene.

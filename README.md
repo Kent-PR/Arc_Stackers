@@ -9,8 +9,11 @@ agreed build order (Storage Calculator -> Home dashboard -> Crafting Calculator)
 core/               # pure logic, zero printing, zero UI - shared by everything
   models.py          Database
   loader.py          load_items(), find_item_id()
-  representations.py enumerate_representations(), cost(), describe_rep(),
-                      fully_expanded_raw()  (the search engine)
+  fetch.py            ensure_data() - downloads/caches items/ from
+                       RaidTheory/arcraiders-data into an OS cache dir
+                       (never committed to this repo, see below)
+  representations.py enumerate_representations(), cost(), cell_groups(),
+                      describe_rep(), fully_expanded_raw()  (the search engine)
   containers.py       build_reverse_index(), best_containers_for(),
                        scan_all_materials()  (recycle/salvage lookups)
   analysis.py         compute_storage(), compute_crafting_naive_vs_optimal()
@@ -18,9 +21,8 @@ core/               # pure logic, zero printing, zero UI - shared by everything
 
 ui/
   main.py            Flet app - Storage Calculator screen
+  widgets.py         build_cell_grid() - the colored storage-cell grid visual
 
-items_data/          RaidTheory/arcraiders-data items/ folder (temporary -
-                      will be replaced by download-on-first-run)
 ```
 
 ## Run
@@ -29,6 +31,15 @@ items_data/          RaidTheory/arcraiders-data items/ folder (temporary -
 pip install -r requirements.txt
 python3 ui/main.py
 ```
+
+On first run this downloads the item data (~3.5 MB of JSON) from
+RaidTheory/arcraiders-data into your OS cache directory - NOT into this
+project folder, so there's nothing data-related to ever commit. Subsequent
+runs use the cached copy and only check for updates once a day (or on
+demand - see `core/fetch.ensure_data(force_check=True)`).
+
+Cache location: `platformdirs.user_cache_dir("arc-storage-optimizer")`
+(e.g. `%LOCALAPPDATA%\arc-storage-optimizer\Cache` on Windows).
 
 ## Data & Attribution
 

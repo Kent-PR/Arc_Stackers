@@ -1,14 +1,15 @@
 """High-level, UI-facing calculations built on top of representations.py.
 Every function here returns plain data (dicts/lists) - no printing.
 """
-from .representations import cost, describe_rep, enumerate_representations, fully_expanded_raw
+from .representations import cell_groups, cost, describe_rep, enumerate_representations, fully_expanded_raw
 
 
 def compute_storage(db, item, n, reverse_index=None, names=None, lang="ru",
                      owned_quantities=None):
     """Everything the Storage Calculator screen needs for one item/quantity:
     the best representation, and every alternative ranked worse-to-better,
-    each with its cell cost and a human-readable label."""
+    each with its cell cost, a human-readable label, and a cell-by-cell
+    breakdown (for the grid visual) attached only to the best one."""
     reps = enumerate_representations(db, item, reverse_index=reverse_index)
     if not reps:
         return None
@@ -23,6 +24,9 @@ def compute_storage(db, item, n, reverse_index=None, names=None, lang="ru",
         {"cost": c, "label": describe_rep(rep, names, lang), "terms": rep}
         for c, rep in scored
     ]
+    ranked[0]["groups"] = cell_groups(
+        db, scored[0][1], n, reverse_index=reverse_index, owned_quantities=owned_quantities
+    )
 
     return {
         "item": item,

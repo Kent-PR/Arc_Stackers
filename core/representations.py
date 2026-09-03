@@ -118,9 +118,28 @@ def fully_expanded_raw(db, item, multiplier=1, acc=None):
 def cost(db, rep, n, reverse_index=None, owned_quantities=None):
     """Cell cost of representation `rep` to cover N units of the root item,
     after subtracting anything already owned."""
+    return sum(g["cells"] for g in cell_groups(db, rep, n, reverse_index, owned_quantities))
+
+
+def cell_groups(db, rep, n, reverse_index=None, owned_quantities=None):
+    """Per-term breakdown of `rep` at quantity N, one group per term, each
+    with the exact fill count of every individual cell - this is what the
+    grid visual (Storage Calculator UI) renders directly.
+
+    Each group: {
+        "occupant": item_id actually sitting in the cell (for a container
+                    term this is the SOURCE item, e.g. "broken_handheld_radio" -
+                    that's what physically takes up the slot, not the
+                    material it converts into),
+        "term_key": the original representation term key (for labelling),
+        "capacity": max units of `occupant` per cell,
+        "fills": [5, 5, 2, ...] - one entry per cell, how full it is,
+        "cells": len(fills),
+    }
+    """
     reverse_index = reverse_index or {}
     owned_quantities = owned_quantities or {}
-    total = 0
+    groups = []
 
     for key, qty_per_unit in rep.items():
         item_id = key[1]
@@ -129,17 +148,31 @@ def cost(db, rep, n, reverse_index=None, owned_quantities=None):
             continue
 
         if key[0] == "raw":
-            total += ceil(needed / db.stack_size[item_id])
+            occupant = item_id
+            capacity = db.stack_size[item_id]
+            units_to_place = needed
         else:
             _, item_id, source, method = key
             cand = next(
                 c for c in reverse_index[item_id]
                 if c["source"] == source and c["method"] == method
             )
-            containers_needed = ceil(needed / cand["qty_per_source_unit"])
-            total += ceil(containers_needed / cand["source_stack_size"])
+            occupant = source
+            capacity = cand["source_stack_size"]
+            units_to_place = ceil(needed / cand["qty_per_source_unit"])
 
-    return total
+        full_cells, remainder = divmod(units_to_place, capacity)
+        fills = [capacity] * full_cells + ([remainder] if remainder else [])
+
+        groups.append({
+            "occupant": occupant,
+            "term_key": key,
+            "capacity": capacity,
+            "fills": fills,
+            "cells": len(fills),
+        })
+
+    return groups
 
 
 def describe_rep(rep, names=None, lang="ru"):

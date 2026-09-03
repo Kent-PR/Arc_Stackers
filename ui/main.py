@@ -11,17 +11,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.analysis import compute_storage
 from core.containers import build_reverse_index
+from core.fetch import ensure_data
 from core.loader import find_item_id, load_items
+from ui.widgets import build_cell_grid
 
-ITEMS_DIR = os.path.join(os.path.dirname(__file__), "..", "items_data")
+ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
 
 
 def main(page: ft.Page):
     page.title = "ARC Raiders Storage Optimizer"
     page.padding = 20
 
-    # --- load data once at startup ---
-    db, names, raw_data = load_items(ITEMS_DIR, lang="en")
+    # --- ensure item data is present (downloads on first run, checks for
+    #     updates afterwards; see core/fetch.py) then load it ---
+    items_dir = ensure_data(on_status=lambda m: print(m))  # TODO: route to a loading screen
+    db, names, raw_data = load_items(items_dir, lang="en")
     reverse_index = build_reverse_index(db, raw_data)
 
     selected_item_id = {"value": None}  # mutable holder, simplest way to share state
@@ -81,11 +85,13 @@ def main(page: ft.Page):
                     ft.Text(f"{best['label']}"),
                     ft.Text(f"{best['cost']} cell(s)", size=20, weight=ft.FontWeight.BOLD),
                 ]),
-                bgcolor=ft.Colors.BLACK,
+                bgcolor=ft.Colors.GREEN_50,
                 border_radius=8,
                 padding=12,
             )
         )
+        results_column.controls.append(build_cell_grid(best["groups"], names))
+        results_column.controls.append(ft.Text("Other options:", weight=ft.FontWeight.BOLD))
         for alt in result["alternatives"][:4]:
             results_column.controls.append(
                 ft.Row([
