@@ -21,7 +21,7 @@ core/               # pure logic, zero printing, zero UI - shared by everything
 
 ui/
   main.py            Flet app - Storage Calculator screen
-  widgets.py         build_cell_grid() - the colored storage-cell grid visual
+  widgets.py         build_cell_grid() - rarity-colored storage-cell grid
 
 ```
 
@@ -58,6 +58,6 @@ Please keep this attribution if you fork/redistribute.
   an explicit set (including an empty one). `None` means unrestricted -
   that's what Storage Calculator and the Home dashboard should keep using.
 - No persistent "avoid this item" list - deliberately dropped, see chat
-  history. Rarity/foundIn fields exist in the data but are NOT used yet
-  (rarity is purely cosmetic; foundIn is earmarked for a future "which loot
+  history. Rarity controls item colors in the storage grid; foundIn is
+  earmarked for a future "which loot
   container drops this" feature - not built yet).
