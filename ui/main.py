@@ -2,7 +2,9 @@
 Home dashboard and Crafting Calculator will be added as separate screens
 once this skeleton is confirmed working end-to-end.
 """
+import asyncio
 import os
+import random
 import sys
 
 import flet as ft
@@ -29,6 +31,7 @@ def main(page: ft.Page):
     reverse_index = build_reverse_index(db, raw_data)
 
     selected_item_id = {"value": None}  # mutable holder, simplest way to share state
+    animation_generation = {"value": 0}
 
     search_field = ft.TextField(label="Search item", width=350, autofocus=True)
     matches_list = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, height=150)
@@ -65,7 +68,9 @@ def main(page: ft.Page):
                 )
         page.update()
 
-    def on_calculate_click(e):
+    async def on_calculate_click(e):
+        animation_generation["value"] += 1
+        current_generation = animation_generation["value"]
         item_id = selected_item_id["value"]
         grid_column.controls.clear()
         results_column.controls.clear()
@@ -98,7 +103,10 @@ def main(page: ft.Page):
                 padding=12,
             )
         )
-        grid_column.controls.append(build_cell_grid(best["groups"], names, raw_data))
+        grid, animated_cells = build_cell_grid(
+            best["groups"], names, raw_data, animate_colors=True
+        )
+        grid_column.controls.append(grid)
         results_column.controls.append(ft.Text("Other options:", weight=ft.FontWeight.BOLD))
         for alt in result["alternatives"][:4]:
             results_column.controls.append(
@@ -108,6 +116,36 @@ def main(page: ft.Page):
                 ])
             )
         page.update()
+
+        await asyncio.sleep(0.75)
+        cell_index = 0
+        while cell_index < len(animated_cells):
+            if current_generation != animation_generation["value"]:
+                return
+
+            reveal_count = (
+                2
+                if cell_index + 1 < len(animated_cells) and random.random() < 0.1
+                else 1
+            )
+            reveal_batch = animated_cells[cell_index:cell_index + reveal_count]
+
+            for color_layer, _, _ in reveal_batch:
+                color_layer.width = CELL_SIZE
+                color_layer.update()
+
+            await asyncio.sleep(0.4)
+            if current_generation != animation_generation["value"]:
+                return
+            for color_layer, label_layer, target_color in reveal_batch:
+                color_layer.gradient = None
+                color_layer.bgcolor = target_color
+                label_layer.visible = True
+                color_layer.update()
+                label_layer.update()
+
+            await asyncio.sleep(0.35)
+            cell_index += reveal_count
 
     search_field.on_change = on_search_change
     calculate_button.on_click = on_calculate_click
