@@ -13,7 +13,7 @@ from core.analysis import compute_storage
 from core.containers import build_reverse_index
 from core.fetch import ensure_data
 from core.loader import find_item_id, load_items
-from ui.widgets import build_cell_grid
+from ui.widgets import CELL_SIZE, COLUMNS, build_cell_grid
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
 
@@ -113,7 +113,7 @@ def main(page: ft.Page):
     calculate_button.on_click = on_calculate_click
 
     input_panel = ft.Container(
-        width=400,
+        expand=True,
         padding=ft.Padding.only(left=20),
         content=ft.Column(
             [
@@ -133,7 +133,11 @@ def main(page: ft.Page):
     page.add(
         ft.Row(
             [
-                ft.Container(content=grid_column, expand=True, padding=ft.Padding.only(right=20)),
+                ft.Container(
+                    content=grid_column,
+                    width=CELL_SIZE * COLUMNS + 6 * (COLUMNS - 1) + 20,
+                    padding=ft.Padding.only(right=20),
+                ),
                 ft.VerticalDivider(width=1, thickness=1, color=ft.Colors.GREY_400),
                 input_panel,
             ],
