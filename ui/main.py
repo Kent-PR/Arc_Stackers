@@ -35,6 +35,13 @@ def main(page: ft.Page):
     quantity_field = ft.TextField(label="Quantity", value="1", width=120)
     calculate_button = ft.ElevatedButton(content="Calculate", disabled=True)
     selected_label = ft.Text(value="No item selected", italic=True)
+    grid_column = ft.Column(
+        [ft.Text("Select an item and calculate to display its storage grid.", italic=True)],
+        spacing=8,
+        scroll=ft.ScrollMode.ALWAYS,
+        expand=True,
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+    )
     results_column = ft.Column(spacing=8)
 
     def pick_item(item_id, label):
@@ -60,6 +67,7 @@ def main(page: ft.Page):
 
     def on_calculate_click(e):
         item_id = selected_item_id["value"]
+        grid_column.controls.clear()
         results_column.controls.clear()
         if not item_id:
             page.update()
@@ -90,7 +98,7 @@ def main(page: ft.Page):
                 padding=12,
             )
         )
-        results_column.controls.append(build_cell_grid(best["groups"], names))
+        grid_column.controls.append(build_cell_grid(best["groups"], names, raw_data))
         results_column.controls.append(ft.Text("Other options:", weight=ft.FontWeight.BOLD))
         for alt in result["alternatives"][:4]:
             results_column.controls.append(
@@ -104,14 +112,35 @@ def main(page: ft.Page):
     search_field.on_change = on_search_change
     calculate_button.on_click = on_calculate_click
 
+    input_panel = ft.Container(
+        width=400,
+        padding=ft.Padding.only(left=20),
+        content=ft.Column(
+            [
+                ft.Text("Storage Calculator", size=24, weight=ft.FontWeight.BOLD),
+                search_field,
+                matches_list,
+                selected_label,
+                ft.Row([quantity_field, calculate_button]),
+                ft.Divider(),
+                results_column,
+            ],
+            spacing=12,
+            scroll=ft.ScrollMode.AUTO,
+        ),
+    )
+
     page.add(
-        ft.Text("Storage Calculator", size=24, weight=ft.FontWeight.BOLD),
-        search_field,
-        matches_list,
-        selected_label,
-        ft.Row([quantity_field, calculate_button]),
-        ft.Divider(),
-        results_column,
+        ft.Row(
+            [
+                ft.Container(content=grid_column, expand=True, padding=ft.Padding.only(right=20)),
+                ft.VerticalDivider(width=1, thickness=1, color=ft.Colors.GREY_400),
+                input_panel,
+            ],
+            expand=True,
+            spacing=0,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+        )
     )
 
 
