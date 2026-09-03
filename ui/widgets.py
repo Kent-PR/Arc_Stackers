@@ -23,6 +23,8 @@ RARITY_COLORS = {
     "legendary": ft.Colors.AMBER_500,
 }
 DEFAULT_RARITY_COLOR = ft.Colors.GREY_400
+REVEAL_COVER_COLOR = ft.Colors.GREY_800
+REVEAL_EDGE_WIDTH = 10
 
 
 def _name_font_size(name):
@@ -164,19 +166,30 @@ def build_cell_grid(groups, names, item_data, animate_colors=False):
             item_name = names.get(occupant, occupant)
             target_color = color_of[occupant]
             color_layer = ft.Container(
-                width=0 if animate_colors else CELL_SIZE,
+                width=CELL_SIZE,
                 height=CELL_SIZE,
                 bgcolor=target_color,
-                gradient=ft.LinearGradient(
+            )
+            cover_layer = ft.Container(
+                left=-REVEAL_EDGE_WIDTH,
+                width=CELL_SIZE + REVEAL_EDGE_WIDTH,
+                height=CELL_SIZE,
+                bgcolor=REVEAL_COVER_COLOR,
+                visible=animate_colors,
+                animate_position=ft.Animation(400, ft.AnimationCurve.EASE_IN_OUT),
+            )
+            cover_blur_gradient = ft.LinearGradient(
                     begin=ft.Alignment.CENTER_LEFT,
                     end=ft.Alignment.CENTER_RIGHT,
-                    colors=[target_color, target_color, DEFAULT_RARITY_COLOR],
-                    stops=[0, 0.86, 1],
-                ) if animate_colors else None,
-                animate=ft.Animation(400, ft.AnimationCurve.EASE_IN_OUT),
+                    colors=[
+                        ft.Colors.with_opacity(0, REVEAL_COVER_COLOR),
+                        REVEAL_COVER_COLOR,
+                        REVEAL_COVER_COLOR,
+                    ],
+                    stops=[0, REVEAL_EDGE_WIDTH / (CELL_SIZE + REVEAL_EDGE_WIDTH), 1],
             )
             label_layer = ft.Stack(
-                visible=not animate_colors,
+                visible=True,
                 controls=[
                     ft.Container(
                         width=CELL_SIZE,
@@ -211,7 +224,7 @@ def build_cell_grid(groups, names, item_data, animate_colors=False):
             cell = ft.Container(
                     width=CELL_SIZE,
                     height=CELL_SIZE,
-                    bgcolor=DEFAULT_RARITY_COLOR,
+                    bgcolor=target_color,
                     opacity=0 if animate_colors else 1,
                     scale=0.75 if animate_colors else 1,
                     animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
@@ -219,7 +232,7 @@ def build_cell_grid(groups, names, item_data, animate_colors=False):
                     border_radius=6,
                     clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                     content=ft.Stack(
-                        [color_layer, label_layer]
+                        [color_layer, label_layer, cover_layer]
                     ),
                 )
             cell_slot = ft.GestureDetector(
@@ -244,7 +257,9 @@ def build_cell_grid(groups, names, item_data, animate_colors=False):
                 ),
             )
             row_controls.append(cell_slot)
-            animated_cells.append((cell, color_layer, label_layer, target_color))
+            animated_cells.append(
+                (cell, cover_layer, cover_blur_gradient, label_layer)
+            )
         # pad the last row with empty placeholders so the grid stays 4-wide
         while len(row_controls) < COLUMNS:
             row_controls.append(ft.Container(width=CELL_SLOT_SIZE, height=CELL_SLOT_SIZE))
