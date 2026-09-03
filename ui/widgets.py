@@ -9,7 +9,7 @@ the shared visual language for the square border/background.
 """
 import flet as ft
 
-CELL_SIZE = 56
+CELL_SIZE = 128
 COLUMNS = 4
 
 RARITY_COLORS = {
@@ -22,10 +22,29 @@ RARITY_COLORS = {
 DEFAULT_RARITY_COLOR = ft.Colors.GREY_400
 
 
+def _name_font_size(name):
+    """Fit both the full label and its longest unbreakable word in a cell."""
+    length = len(name)
+    if length <= 18:
+        size_for_label = 20
+    elif length <= 30:
+        size_for_label = 17
+    elif length <= 44:
+        size_for_label = 14
+    else:
+        size_for_label = 12
+
+    longest_word = max((len(word) for word in name.split()), default=1)
+    available_width = CELL_SIZE - 32  # matches the name container's padding
+    # Bold glyphs average less than this, so 0.75 leaves room for wide letters.
+    size_for_word = int(available_width / (longest_word * 0.75))
+    return max(10, min(size_for_label, size_for_word))
+
+
 def build_cell_grid(groups, names, item_data):
     """groups: list of {occupant, capacity, fills, cells} from
-    core.representations.cell_groups(). Returns a Flet Column: the grid
-    plus a legend underneath. item_data maps item ids to their raw JSON."""
+    core.representations.cell_groups(). Returns a Flet Column containing
+    the item-labelled grid. item_data maps item ids to their raw JSON."""
     color_of = {
         g["occupant"]: RARITY_COLORS.get(
             str(item_data.get(g["occupant"], {}).get("rarity", "")).lower(),
@@ -45,14 +64,44 @@ def build_cell_grid(groups, names, item_data):
         row_cells = cells[row_start:row_start + COLUMNS]
         row_controls = []
         for occupant, fill, capacity in row_cells:
+            item_name = names.get(occupant, occupant)
             row_controls.append(
                 ft.Container(
                     width=CELL_SIZE,
                     height=CELL_SIZE,
                     bgcolor=color_of[occupant],
                     border_radius=6,
-                    alignment=ft.Alignment.CENTER,
-                    content=ft.Text(f"{fill}/{capacity}", size=12, weight=ft.FontWeight.BOLD),
+                    content=ft.Stack(
+                        [
+                            ft.Container(
+                                width=CELL_SIZE,
+                                height=CELL_SIZE,
+                                padding=16,
+                                alignment=ft.Alignment.CENTER,
+                                content=ft.Text(
+                                    item_name,
+                                    size=_name_font_size(item_name),
+                                    weight=ft.FontWeight.BOLD,
+                                    text_align=ft.TextAlign.CENTER,
+                                    color=ft.Colors.WHITE,
+                                    max_lines=4,
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                ),
+                            ),
+                            ft.Container(
+                                width=CELL_SIZE,
+                                height=CELL_SIZE,
+                                padding=12,
+                                alignment=ft.Alignment.BOTTOM_RIGHT,
+                                content=ft.Text(
+                                    f"{fill}/{capacity}",
+                                    size=14,
+                                    weight=ft.FontWeight.BOLD,
+                                    color=ft.Colors.WHITE,
+                                ),
+                            ),
+                        ]
+                    ),
                 )
             )
         # pad the last row with empty placeholders so the grid stays 4-wide
@@ -60,16 +109,4 @@ def build_cell_grid(groups, names, item_data):
             row_controls.append(ft.Container(width=CELL_SIZE, height=CELL_SIZE))
         rows.append(ft.Row(row_controls, spacing=6))
 
-    legend = ft.Row(
-        [
-            ft.Row([
-                ft.Container(width=14, height=14, bgcolor=color, border_radius=3),
-                ft.Text(names.get(occupant, occupant), size=12),
-            ], spacing=4)
-            for occupant, color in color_of.items()
-        ],
-        spacing=16,
-        wrap=True,
-    )
-
-    return ft.Column([ft.Column(rows, spacing=6), ft.Container(height=8), legend])
+    return ft.Column(rows, spacing=6)
