@@ -98,7 +98,7 @@ def main(page: ft.Page):
                     ft.Text(f"{best['label']}"),
                     ft.Text(f"{best['cost']} cell(s)", size=20, weight=ft.FontWeight.BOLD),
                 ]),
-                bgcolor=ft.Colors.GREEN_50,
+                bgcolor=ft.Colors.BLACK_45,
                 border_radius=8,
                 padding=12,
             )
