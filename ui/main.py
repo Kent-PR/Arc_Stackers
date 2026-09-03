@@ -159,19 +159,17 @@ def main(page: ft.Page):
             )
             reveal_batch = animated_cells[cell_index:cell_index + reveal_count]
 
-            for _, color_layer, _, _ in reveal_batch:
-                color_layer.width = CELL_SIZE
-                color_layer.update()
+            for _, cover_layer, cover_blur_gradient, _ in reveal_batch:
+                cover_layer.gradient = cover_blur_gradient
+                cover_layer.left = CELL_SIZE
+                cover_layer.update()
 
             await asyncio.sleep(0.4)
             if current_generation != animation_generation["value"]:
                 return
-            for _, color_layer, label_layer, target_color in reveal_batch:
-                color_layer.gradient = None
-                color_layer.bgcolor = target_color
-                label_layer.visible = True
-                color_layer.update()
-                label_layer.update()
+            for _, cover_layer, _, label_layer in reveal_batch:
+                cover_layer.visible = False
+                cover_layer.update()
 
             await asyncio.sleep(0.35)
             cell_index += reveal_count
