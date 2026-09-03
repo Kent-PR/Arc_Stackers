@@ -1,34 +1,38 @@
 """Storage cell grid widget - renders a fixed-width grid of squares, one per
-storage cell, colored by which item occupies it and labelled with its fill
+storage cell, colored by item rarity and labelled with its fill
 (e.g. "5/5"). Used by the Storage Calculator screen (and later, the Home
 dashboard / Crafting Calculator - same visual language everywhere).
 
 TODO (future, once item images are wired up): replace the plain colored
-square with the item's icon (from imageFilename / CDN) and tint the square
-border by the item's `rarity` instead of an arbitrary palette color.
+square with the item's icon (from imageFilename / CDN), keeping rarity as
+the shared visual language for the square border/background.
 """
 import flet as ft
 
 CELL_SIZE = 56
 COLUMNS = 4
 
-# Arbitrary distinct palette for now - stands in for "item icon" until we
-# wire up real artwork. Cycles if there are more occupant types than colors.
-_PALETTE = [
-    ft.Colors.BLUE_300, ft.Colors.GREEN_300, ft.Colors.ORANGE_300,
-    ft.Colors.PURPLE_300, ft.Colors.RED_300, ft.Colors.TEAL_300,
-    ft.Colors.AMBER_300, ft.Colors.PINK_300,
-]
+RARITY_COLORS = {
+    "common": ft.Colors.GREY_400,
+    "uncommon": ft.Colors.GREEN_400,
+    "rare": ft.Colors.BLUE_400,
+    "epic": ft.Colors.PURPLE_400,
+    "legendary": ft.Colors.AMBER_500,
+}
+DEFAULT_RARITY_COLOR = ft.Colors.GREY_400
 
 
-def build_cell_grid(groups, names):
+def build_cell_grid(groups, names, item_data):
     """groups: list of {occupant, capacity, fills, cells} from
     core.representations.cell_groups(). Returns a Flet Column: the grid
-    plus a legend underneath."""
-    color_of = {}
-    for g in groups:
-        if g["occupant"] not in color_of:
-            color_of[g["occupant"]] = _PALETTE[len(color_of) % len(_PALETTE)]
+    plus a legend underneath. item_data maps item ids to their raw JSON."""
+    color_of = {
+        g["occupant"]: RARITY_COLORS.get(
+            str(item_data.get(g["occupant"], {}).get("rarity", "")).lower(),
+            DEFAULT_RARITY_COLOR,
+        )
+        for g in groups
+    }
 
     # flatten groups into an ordered list of individual cells
     cells = []
