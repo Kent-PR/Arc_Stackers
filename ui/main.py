@@ -15,7 +15,7 @@ from core.analysis import compute_storage
 from core.containers import build_reverse_index
 from core.fetch import ensure_data
 from core.loader import find_item_id, load_items
-from ui.widgets import CELL_SIZE, COLUMNS, build_cell_grid
+from ui.widgets import CELL_SIZE, CELL_SLOT_SIZE, COLUMNS, build_cell_grid
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
 
@@ -117,7 +117,36 @@ def main(page: ft.Page):
             )
         page.update()
 
-        await asyncio.sleep(0.75)
+        # Pause briefly before starting the complete drawing sequence.
+        await asyncio.sleep(0.5)
+        if current_generation != animation_generation["value"]:
+            return
+        if not animated_cells:
+            return
+
+        # Start the first grey cell immediately, then let the remaining grey
+        # cells appear in parallel with the later color-reveal sequence.
+        first_cell, _, _, _ = animated_cells[0]
+        first_cell.opacity = 1
+        first_cell.scale = 1
+        first_cell.update()
+
+        async def reveal_remaining_grey_cells():
+            for cell, _, _, _ in animated_cells[1:]:
+                await asyncio.sleep(0.02)
+                if current_generation != animation_generation["value"]:
+                    return
+                cell.opacity = 1
+                cell.scale = 1
+                cell.update()
+
+        asyncio.create_task(reveal_remaining_grey_cells())
+
+        # Only wait for the first cell's 200 ms appearance animation.
+        await asyncio.sleep(0.2)
+        if current_generation != animation_generation["value"]:
+            return
+
         cell_index = 0
         while cell_index < len(animated_cells):
             if current_generation != animation_generation["value"]:
@@ -130,14 +159,14 @@ def main(page: ft.Page):
             )
             reveal_batch = animated_cells[cell_index:cell_index + reveal_count]
 
-            for color_layer, _, _ in reveal_batch:
+            for _, color_layer, _, _ in reveal_batch:
                 color_layer.width = CELL_SIZE
                 color_layer.update()
 
             await asyncio.sleep(0.4)
             if current_generation != animation_generation["value"]:
                 return
-            for color_layer, label_layer, target_color in reveal_batch:
+            for _, color_layer, label_layer, target_color in reveal_batch:
                 color_layer.gradient = None
                 color_layer.bgcolor = target_color
                 label_layer.visible = True
@@ -173,7 +202,8 @@ def main(page: ft.Page):
             [
                 ft.Container(
                     content=grid_column,
-                    width=CELL_SIZE * COLUMNS + 6 * (COLUMNS - 1) + 20,
+                    # Grid width + 20 px for the scrollbar + 20 px panel padding.
+                    width=CELL_SLOT_SIZE * COLUMNS + 40,
                     padding=ft.Padding.only(right=20),
                 ),
                 ft.VerticalDivider(width=1, thickness=1, color=ft.Colors.GREY_400),
