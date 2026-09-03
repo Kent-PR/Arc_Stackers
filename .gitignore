@@ -16,6 +16,7 @@ ENV/
 build/
 dist/
 *.egg-info/
+RELEASE_NOTES.md
 *.spec
 
 # Tests and coverage
