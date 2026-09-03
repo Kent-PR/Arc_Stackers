@@ -1,10 +1,42 @@
-core/__pycache__/
-*.pyc
+# Python bytecode and type-checker caches
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache/
+.pytype/
+.ruff_cache/
+
+# Virtual environments
 .venv/
 venv/
-build/
-*.egg-info/
+env/
+ENV/
 
-# Item data is fetched at runtime into an OS cache directory (see
-# core/fetch.py) - it never lives inside this repo, so nothing to ignore
-# here for it specifically. This is just standard Python project hygiene.
+# Packaging and distribution artifacts
+build/
+dist/
+*.egg-info/
+*.spec
+
+# Tests and coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# IDE and operating-system files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Item data is downloaded at runtime into the OS cache directory, not this repo.
