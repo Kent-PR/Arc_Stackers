@@ -1,16 +1,23 @@
 """Lazy, persistent cache for item artwork referenced by item JSON."""
 
 import hashlib
+import io
 import threading
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
+
+from PIL import Image, ImageFilter, UnidentifiedImageError
 
 from .fetch import APP_NAME, CACHE_DIR
 
 
 IMAGES_DIR = CACHE_DIR / "images"
 IMAGE_DOWNLOAD_TIMEOUT = 20
+SHADOW_BLUR_RADIUS = 7
+SHADOW_OFFSET = (0, 5)
+SHADOW_OPACITY = 110
+SHADOW_CACHE_VERSION = 1
 
 _locks_guard = threading.Lock()
 _download_locks = {}
@@ -31,6 +38,50 @@ def _cache_path(item_id, url):
     return IMAGES_DIR / f"{safe_id}-{url_hash}{suffix}"
 
 
+def _shadow_cache_path(original_path):
+    return original_path.with_name(
+        f"{original_path.stem}.shadow-v{SHADOW_CACHE_VERSION}.png"
+    )
+
+
+def _add_drop_shadow(image_bytes):
+    """Return a PNG with a soft shadow following the source alpha channel."""
+    with Image.open(io.BytesIO(image_bytes)) as source:
+        source = source.convert("RGBA")
+        blurred_alpha = source.getchannel("A").filter(
+            ImageFilter.GaussianBlur(SHADOW_BLUR_RADIUS)
+        )
+        blurred_alpha = blurred_alpha.point(
+            lambda alpha: alpha * SHADOW_OPACITY // 255
+        )
+
+        shifted_alpha = Image.new("L", source.size, 0)
+        shifted_alpha.paste(blurred_alpha, SHADOW_OFFSET)
+        shadow = Image.new("RGBA", source.size, (0, 0, 0, 0))
+        shadow.putalpha(shifted_alpha)
+
+        rendered = Image.alpha_composite(shadow, source)
+        output = io.BytesIO()
+        rendered.save(output, format="PNG")
+        return output.getvalue()
+
+
+def _render_and_cache_shadow(original_path, image_bytes):
+    """Create the derived image atomically; fall back to the original."""
+    shadow_path = _shadow_cache_path(original_path)
+    try:
+        if shadow_path.is_file() and shadow_path.stat().st_size:
+            return shadow_path.read_bytes()
+
+        rendered_bytes = _add_drop_shadow(image_bytes)
+        temporary = shadow_path.with_suffix(shadow_path.suffix + ".part")
+        temporary.write_bytes(rendered_bytes)
+        temporary.replace(shadow_path)
+        return rendered_bytes
+    except (OSError, ValueError, UnidentifiedImageError):
+        return image_bytes
+
+
 def get_cached_image(item_id, url):
     """Download an image once and return its bytes, or ``None`` on failure.
 
@@ -45,7 +96,9 @@ def get_cached_image(item_id, url):
     with _download_lock(url):
         try:
             if destination.is_file() and destination.stat().st_size:
-                return destination.read_bytes()
+                return _render_and_cache_shadow(
+                    destination, destination.read_bytes()
+                )
 
             IMAGES_DIR.mkdir(parents=True, exist_ok=True)
             request = urllib.request.Request(
@@ -64,6 +117,6 @@ def get_cached_image(item_id, url):
             temporary = destination.with_suffix(destination.suffix + ".part")
             temporary.write_bytes(image_bytes)
             temporary.replace(destination)
-            return image_bytes
+            return _render_and_cache_shadow(destination, image_bytes)
         except (OSError, ValueError):
             return None
