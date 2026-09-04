@@ -15,6 +15,7 @@ from core.analysis import compute_storage
 from core.containers import build_reverse_index
 from core.fetch import ensure_data
 from core.loader import find_item_id, load_items
+from core.portfolio import compute_storage_portfolio
 from ui.widgets import CELL_SIZE, CELL_SLOT_SIZE, COLUMNS, build_cell_grid
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
@@ -139,22 +140,19 @@ def main(page: ft.Page):
         if not storage_items:
             page.update()
             return
-        if len(storage_items) > 1:
-            results_column.controls.append(
-                ft.Text(
-                    "Several items are ready. Joint storage optimization is the next implementation step.",
-                    color=ft.Colors.AMBER_400,
-                )
+        is_portfolio = len(storage_items) > 1
+        if is_portfolio:
+            try:
+                result = compute_storage_portfolio(db, storage_items, raw_data, names=names)
+            except ValueError as error:
+                results_column.controls.append(ft.Text(str(error), color=ft.Colors.RED_400))
+                page.update()
+                return
+        else:
+            item_id, n = next(iter(storage_items.items()))
+            result = compute_storage(
+                db, item_id, n, reverse_index=reverse_index, names=names, lang="en"
             )
-            grid_column.controls.append(
-                ft.Text("Joint result will appear here after the portfolio optimizer is added.", italic=True)
-            )
-            page.update()
-            return
-
-        item_id, n = next(iter(storage_items.items()))
-
-        result = compute_storage(db, item_id, n, reverse_index=reverse_index, names=names, lang="en")
         if result is None:
             results_column.controls.append(ft.Text("This item cannot be stored (no stack size known)."))
             page.update()
@@ -164,8 +162,11 @@ def main(page: ft.Page):
         results_column.controls.append(
             ft.Container(
                 content=ft.Column([
-                    ft.Text("Best storage method", weight=ft.FontWeight.BOLD),
-                    ft.Text(f"{best['label']}"),
+                    ft.Text(
+                        "Best combined storage plan" if is_portfolio else "Best storage method",
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    *([] if is_portfolio else [ft.Text(f"{best['label']}")]),
                     ft.Text(f"{best['cost']} cell(s)", size=20, weight=ft.FontWeight.BOLD),
                 ]),
                 bgcolor=ft.Colors.BLACK_45,
@@ -177,14 +178,31 @@ def main(page: ft.Page):
             best["groups"], names, raw_data, animate_colors=True
         )
         grid_column.controls.append(grid)
-        results_column.controls.append(ft.Text("Other options:", weight=ft.FontWeight.BOLD))
-        for alt in result["alternatives"][:4]:
-            results_column.controls.append(
-                ft.Row([
-                    ft.Text(f"{alt['cost']} cell(s)", width=90),
-                    ft.Text(alt["label"]),
-                ])
-            )
+        if is_portfolio:
+            results_column.controls.append(ft.Text("Coverage", weight=ft.FontWeight.BOLD))
+            for covered_item, coverage in best["coverage"].items():
+                excess = coverage["excess"]
+                suffix = f" (+{excess} excess)" if excess else ""
+                results_column.controls.append(
+                    ft.Text(
+                        f"{names.get(covered_item, covered_item)}: "
+                        f"{coverage['produced']} / {coverage['requested']}{suffix}"
+                    )
+                )
+            results_column.controls.append(ft.Text("Stored physically", weight=ft.FontWeight.BOLD))
+            for source, quantity in best["stored"].items():
+                results_column.controls.append(
+                    ft.Text(f"{quantity} × {names.get(source, source)}")
+                )
+        else:
+            results_column.controls.append(ft.Text("Other options:", weight=ft.FontWeight.BOLD))
+            for alt in result["alternatives"][:4]:
+                results_column.controls.append(
+                    ft.Row([
+                        ft.Text(f"{alt['cost']} cell(s)", width=90),
+                        ft.Text(alt["label"]),
+                    ])
+                )
         page.update()
 
         # Pause briefly before starting the complete drawing sequence.
