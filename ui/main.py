@@ -31,13 +31,16 @@ def main(page: ft.Page):
     reverse_index = build_reverse_index(db, raw_data)
 
     selected_item_id = {"value": None}  # mutable holder, simplest way to share state
+    storage_items = {}
     animation_generation = {"value": 0}
 
     search_field = ft.TextField(label="Search item", width=350, autofocus=True)
     matches_list = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, height=150)
-    quantity_field = ft.TextField(label="Quantity", value="1", width=120)
-    calculate_button = ft.ElevatedButton(content="Calculate", disabled=True)
+    quantity_field = ft.TextField(label="Quantity to add", value="1", width=140)
+    add_button = ft.ElevatedButton(content="Add item", disabled=True)
+    calculate_button = ft.ElevatedButton(content="Calculate storage", disabled=True)
     selected_label = ft.Text(value="No item selected", italic=True)
+    storage_items_column = ft.Column(spacing=6)
     grid_column = ft.Column(
         [ft.Text("Select an item and calculate to display its storage grid.", italic=True)],
         spacing=8,
@@ -50,8 +53,68 @@ def main(page: ft.Page):
     def pick_item(item_id, label):
         selected_item_id["value"] = item_id
         selected_label.value = f"Selected: {label}"
-        calculate_button.disabled = False
+        add_button.disabled = False
         matches_list.controls.clear()
+        page.update()
+
+    def refresh_storage_items():
+        storage_items_column.controls.clear()
+        for item_id, quantity in storage_items.items():
+            quantity_input = ft.TextField(
+                value=str(quantity),
+                width=82,
+                dense=True,
+                text_align=ft.TextAlign.RIGHT,
+                on_change=lambda e, iid=item_id: change_storage_quantity(iid, e),
+            )
+            storage_items_column.controls.append(
+                ft.Row(
+                    [
+                        ft.Text(names.get(item_id, item_id), expand=True),
+                        quantity_input,
+                        ft.TextButton(
+                            content="Remove",
+                            on_click=lambda e, iid=item_id: remove_storage_item(iid),
+                        ),
+                    ],
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                )
+            )
+        calculate_button.disabled = not storage_items
+
+    def change_storage_quantity(item_id, e):
+        try:
+            quantity = int(e.control.value)
+            if quantity <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            e.control.error_text = "Positive integer"
+        else:
+            storage_items[item_id] = quantity
+            e.control.error_text = None
+        page.update()
+
+    def remove_storage_item(item_id):
+        storage_items.pop(item_id, None)
+        refresh_storage_items()
+        page.update()
+
+    def add_storage_item(e):
+        item_id = selected_item_id["value"]
+        if not item_id:
+            return
+        try:
+            quantity = int(quantity_field.value)
+            if quantity <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            quantity_field.error_text = "Enter a positive whole number"
+            page.update()
+            return
+
+        quantity_field.error_text = None
+        storage_items[item_id] = storage_items.get(item_id, 0) + quantity
+        refresh_storage_items()
         page.update()
 
     def on_search_change(e):
@@ -71,18 +134,25 @@ def main(page: ft.Page):
     async def on_calculate_click(e):
         animation_generation["value"] += 1
         current_generation = animation_generation["value"]
-        item_id = selected_item_id["value"]
         grid_column.controls.clear()
         results_column.controls.clear()
-        if not item_id:
+        if not storage_items:
             page.update()
             return
-        try:
-            n = int(quantity_field.value)
-        except (TypeError, ValueError):
-            results_column.controls.append(ft.Text("Quantity must be a whole number", color="red"))
+        if len(storage_items) > 1:
+            results_column.controls.append(
+                ft.Text(
+                    "Several items are ready. Joint storage optimization is the next implementation step.",
+                    color=ft.Colors.AMBER_400,
+                )
+            )
+            grid_column.controls.append(
+                ft.Text("Joint result will appear here after the portfolio optimizer is added.", italic=True)
+            )
             page.update()
             return
+
+        item_id, n = next(iter(storage_items.items()))
 
         result = compute_storage(db, item_id, n, reverse_index=reverse_index, names=names, lang="en")
         if result is None:
@@ -175,6 +245,7 @@ def main(page: ft.Page):
             cell_index += reveal_count
 
     search_field.on_change = on_search_change
+    add_button.on_click = add_storage_item
     calculate_button.on_click = on_calculate_click
 
     input_panel = ft.Container(
@@ -186,7 +257,10 @@ def main(page: ft.Page):
                 search_field,
                 matches_list,
                 selected_label,
-                ft.Row([quantity_field, calculate_button]),
+                ft.Row([quantity_field, add_button]),
+                ft.Text("Items to store", weight=ft.FontWeight.BOLD),
+                storage_items_column,
+                calculate_button,
                 ft.Divider(),
                 results_column,
             ],
