@@ -1,5 +1,5 @@
 # Python bytecode and type-checker caches
-__pycache__/
+core/__pycache__/
 *.py[cod]
 *$py.class
 .mypy_cache/
