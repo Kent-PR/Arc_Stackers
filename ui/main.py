@@ -337,7 +337,7 @@ def main(page: ft.Page):
             )
         filter_picker_items()
 
-    async def toggle_picker(e):
+    def toggle_picker(e):
         if picker_dropdown.visible:
             picker_dropdown.visible = False
             page.update()
@@ -350,7 +350,6 @@ def main(page: ft.Page):
         page.update()
         build_picker_list()
         page.update()
-        await picker_search.focus()
 
     async def close_picker_dropdown(e=None):
         # TextField.on_tap_outside fires before a clicked list row receives
