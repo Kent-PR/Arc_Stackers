@@ -53,13 +53,25 @@ def _name_font_size(name):
     return max(10, min(size_for_label, size_for_word))
 
 
-def _cell_sort_key(occupant, names, item_data):
-    """Sort by descending rarity, then by the stable English item name."""
+def _english_name(occupant, names, item_data):
     data = item_data.get(occupant, {})
-    rarity = str(data.get("rarity", "")).lower()
     localized_names = data.get("name") or {}
-    english_name = localized_names.get("en") or names.get(occupant, occupant)
-    return -RARITY_RANK.get(rarity, 0), english_name.casefold(), occupant.casefold()
+    return localized_names.get("en") or names.get(occupant, occupant)
+
+
+def _cell_sort_key(occupant, fill, names, item_data, sort_mode="rarity"):
+    """Sort cells by the selected metric with stable English-name ties."""
+    data = item_data.get(occupant, {})
+    english_name = _english_name(occupant, names, item_data)
+    name_key = (english_name.casefold(), occupant.casefold())
+    if sort_mode == "value":
+        try:
+            cell_value = float(data.get("value", 0)) * fill
+        except (TypeError, ValueError):
+            cell_value = 0
+        return -cell_value, *name_key
+    rarity = str(data.get("rarity", "")).lower()
+    return -RARITY_RANK.get(rarity, 0), *name_key
 
 
 def _build_hover_border():
@@ -154,7 +166,9 @@ def _build_hover_border():
     return border, on_enter, update_spots, on_exit
 
 
-def build_cell_grid(groups, names, item_data, animate_colors=False):
+def build_cell_grid(
+    groups, names, item_data, animate_colors=False, sort_mode="rarity"
+):
     """groups: list of {occupant, capacity, fills, cells} from
     core.representations.cell_groups(). Returns a Flet Column containing
     the item-labelled grid and its cells in display order. item_data maps
@@ -173,7 +187,11 @@ def build_cell_grid(groups, names, item_data, animate_colors=False):
     for g in groups:
         for fill in g["fills"]:
             cells.append((g["occupant"], fill, g["capacity"]))
-    cells.sort(key=lambda cell: _cell_sort_key(cell[0], names, item_data))
+    cells.sort(
+        key=lambda cell: _cell_sort_key(
+            cell[0], cell[1], names, item_data, sort_mode=sort_mode
+        )
+    )
 
     rows = []
     animated_cells = []
