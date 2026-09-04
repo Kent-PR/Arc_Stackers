@@ -13,6 +13,10 @@ FRAME_INSET_RATIO = 7 / 512
 ARTWORK_LEFT_RATIO = 62 / 512
 ARTWORK_TOP_RATIO = 0 / 512
 ARTWORK_SIZE_RATIO = 385 / 512
+FOOTER_WIDTH_RATIO = 496 / 512
+FOOTER_HEIGHT_RATIO = 120 / 512
+FOOTER_BOTTOM_MARGIN_RATIO = 8 / 512
+FOOTER_CORNER_RADIUS_RATIO = 40 / 512
 COLUMNS = 4
 HOVER_BORDER_MARGIN = 3
 CELL_SLOT_SIZE = CELL_SIZE + HOVER_BORDER_MARGIN * 2
@@ -39,6 +43,7 @@ RARITY_RANK = {
 }
 DEFAULT_RARITY_COLOR = ft.Colors.GREY_400
 ITEM_CARD_BACKGROUND = "#090C19"
+ITEM_CARD_FOOTER_COLOR = "#141725"
 REVEAL_COVER_COLOR = ft.Colors.GREY_800
 REVEAL_EDGE_WIDTH = 10
 FRAME_DIR = Path(__file__).resolve().parents[1] / "media"
@@ -102,6 +107,24 @@ def _build_item_surface(
     artwork.left = size * ARTWORK_LEFT_RATIO
     artwork.top = size * ARTWORK_TOP_RATIO
     controls.append(artwork)
+
+    footer_width = size * FOOTER_WIDTH_RATIO
+    footer_height = size * FOOTER_HEIGHT_RATIO
+    footer_bottom_margin = size * FOOTER_BOTTOM_MARGIN_RATIO
+    footer_radius = size * FOOTER_CORNER_RADIUS_RATIO
+    controls.append(
+        ft.Container(
+            left=(size - footer_width) / 2,
+            top=size - footer_height - footer_bottom_margin,
+            width=footer_width,
+            height=footer_height,
+            bgcolor=ITEM_CARD_FOOTER_COLOR,
+            border_radius=ft.BorderRadius.only(
+                bottom_left=footer_radius,
+                bottom_right=footer_radius,
+            ),
+        )
+    )
     return ft.Container(
         width=size,
         height=size,
@@ -394,7 +417,7 @@ def build_cell_grid(
     cells = []
     for g in groups:
         for fill in g["fills"]:
-            cells.append((g["occupant"], fill, g["capacity"]))
+            cells.append((g["occupant"], fill))
     cells.sort(
         key=lambda cell: _cell_sort_key(
             cell[0], cell[1], names, item_data, sort_mode=sort_mode
@@ -406,7 +429,7 @@ def build_cell_grid(
     for row_start in range(0, len(cells), COLUMNS):
         row_cells = cells[row_start:row_start + COLUMNS]
         row_controls = []
-        for occupant, fill, capacity in row_cells:
+        for occupant, fill in row_cells:
             item_name = names.get(occupant, occupant)
             cover_layer = ft.Container(
                 left=-REVEAL_EDGE_WIDTH,
@@ -441,12 +464,14 @@ def build_cell_grid(
                         font_size=_name_font_size(item_name),
                     ),
                     ft.Container(
-                        width=CELL_SIZE,
-                        height=CELL_SIZE,
-                        padding=12,
-                        alignment=ft.Alignment.BOTTOM_RIGHT,
+                        right=12,
+                        top=CELL_SIZE * (
+                            1 - FOOTER_HEIGHT_RATIO - FOOTER_BOTTOM_MARGIN_RATIO
+                        ),
+                        height=CELL_SIZE * FOOTER_HEIGHT_RATIO,
+                        alignment=ft.Alignment.CENTER_RIGHT,
                         content=ft.Text(
-                            f"{fill}/{capacity}",
+                            str(fill),
                             size=14,
                             weight=ft.FontWeight.BOLD,
                             color=ft.Colors.WHITE,
