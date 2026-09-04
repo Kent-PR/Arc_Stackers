@@ -80,6 +80,37 @@ def _cell_sort_key(occupant, fill, names, item_data, sort_mode="rarity"):
     return -RARITY_RANK.get(rarity, 0), *name_key
 
 
+def build_item_preview(item_id, names, item_data, size=52):
+    """Build a compact rarity cell with a name and no quantity text."""
+    data = item_data.get(item_id, {})
+    rarity = str(data.get("rarity", "")).lower()
+    item_name = names.get(item_id, item_id)
+    if size >= CELL_SIZE:
+        font_size = _name_font_size(item_name)
+        padding = 16
+    else:
+        longest_word = max((len(word) for word in item_name.split()), default=1)
+        font_size = max(6, min(10, int((size - 8) / (longest_word * 0.7))))
+        padding = 4
+    return ft.Container(
+        width=size,
+        height=size,
+        padding=padding,
+        alignment=ft.Alignment.CENTER,
+        bgcolor=RARITY_COLORS.get(rarity, DEFAULT_RARITY_COLOR),
+        border_radius=max(4, size * 6 / CELL_SIZE),
+        content=ft.Text(
+            item_name,
+            size=font_size,
+            weight=ft.FontWeight.BOLD,
+            text_align=ft.TextAlign.CENTER,
+            color=ft.Colors.WHITE,
+            max_lines=4,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        ),
+    )
+
+
 def _build_hover_border(
     width=CELL_SLOT_SIZE,
     height=CELL_SLOT_SIZE,
@@ -184,7 +215,7 @@ def _proportional_outer_radius(inner_radius, width, height, margin):
     return inner_radius * (shortest_side + margin * 2) / shortest_side
 
 
-def build_hover_wrapper(content, width, height, border_radius=8):
+def build_hover_wrapper(content, width, height, border_radius=8, on_tap=None):
     """Wrap an opaque control in the same external hover ring as grid cells."""
     margin = HOVER_BORDER_MARGIN
     hover_border, on_enter, on_hover, on_exit = _build_hover_border(
@@ -205,6 +236,7 @@ def build_hover_wrapper(content, width, height, border_radius=8):
         on_enter=on_enter,
         on_hover=on_hover,
         on_exit=on_exit,
+        on_tap=on_tap,
         content=ft.Stack(
             width=width,
             height=height,

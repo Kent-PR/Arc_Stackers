@@ -16,13 +16,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.analysis import compute_storage
 from core.containers import build_reverse_index
 from core.fetch import ensure_data
-from core.loader import find_item_id, load_items
+from core.loader import load_items
 from core.portfolio import CalculationCancelled, compute_storage_portfolio
 from ui.widgets import (
     CELL_SIZE,
     GRID_WIDTH,
     build_cell_grid,
     build_hover_wrapper,
+    build_item_preview,
 )
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
@@ -47,12 +48,19 @@ def main(page: ft.Page):
     grid_sort_mode = {"value": "rarity"}
     last_grid_groups = {"value": None}
 
-    search_field = ft.TextField(label="Search item", width=350, autofocus=True)
-    matches_list = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, height=150)
-    quantity_field = ft.TextField(label="Quantity to add", value="1", width=140)
-    add_button = ft.ElevatedButton(content="Add item", disabled=True)
+    quantity_field = ft.TextField(
+        value="1",
+        expand=True,
+        dense=True,
+        text_align=ft.TextAlign.CENTER,
+        keyboard_type=ft.KeyboardType.NUMBER,
+    )
+    add_button = ft.ElevatedButton(
+        content="Add item",
+        width=CELL_SIZE,
+        disabled=True,
+    )
     calculate_button = ft.ElevatedButton(content="Calculate storage", disabled=True)
-    selected_label = ft.Text(value="No item selected", italic=True)
     storage_items_column = ft.Column(spacing=6)
     grid_column = ft.Column(
         [ft.Text("Select an item and calculate to display its storage grid.", italic=True)],
@@ -80,6 +88,222 @@ def main(page: ft.Page):
     )
     results_column = ft.Column(spacing=8)
 
+    picker_cell = ft.Container(
+        width=CELL_SIZE,
+        height=CELL_SIZE,
+        alignment=ft.Alignment.CENTER,
+        bgcolor=ft.Colors.GREY_900,
+        border_radius=6,
+        border=ft.Border.all(2, ft.Colors.GREY_600),
+        content=ft.Column(
+            [
+                ft.Icon(ft.Icons.ADD, size=30, color=ft.Colors.GREY_400),
+                ft.Text("Choose item", color=ft.Colors.GREY_400),
+            ],
+            spacing=4,
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+    )
+    picker_search = ft.TextField(
+        label="Search items",
+        prefix_icon=ft.Icons.SEARCH,
+        dense=True,
+    )
+    picker_list_column = ft.Column(
+        spacing=2,
+        scroll=ft.ScrollMode.AUTO,
+        expand=True,
+    )
+    picker_dropdown = ft.Container(
+        content=ft.Column(
+            [picker_search, picker_list_column],
+            spacing=8,
+            expand=True,
+        ),
+        height=320,
+        visible=False,
+        padding=8,
+        border=ft.Border.all(1, ft.Colors.GREY_700),
+        border_radius=8,
+        bgcolor=ft.Colors.GREY_900,
+    )
+    picker_list_built = {"value": False}
+    picker_entries = []
+    committed_cells = {}
+    committed_cells_row = ft.Row(
+        spacing=8,
+        scroll=ft.ScrollMode.AUTO,
+        expand=True,
+    )
+
+    def filter_picker_items(e=None):
+        query = (picker_search.value or "").strip().casefold()
+        for item_id, row, search_text in picker_entries:
+            row.visible = item_id not in storage_items and (
+                not query or query in search_text
+            )
+        if e is not None:
+            page.update()
+
+    def reset_picker():
+        selected_item_id["value"] = None
+        quantity_field.value = "1"
+        quantity_field.error_text = None
+        quantity_controls.visible = False
+        add_button.disabled = True
+        picker_cell.border = ft.Border.all(2, ft.Colors.GREY_600)
+        picker_cell.content = ft.Column(
+            [
+                ft.Icon(ft.Icons.ADD, size=30, color=ft.Colors.GREY_400),
+                ft.Text("Choose item", color=ft.Colors.GREY_400),
+            ],
+            spacing=4,
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+    def commit_current_picker():
+        item_id = selected_item_id["value"]
+        if not item_id or item_id in committed_cells:
+            return
+        preview = build_hover_wrapper(
+            build_item_preview(item_id, names, raw_data, size=CELL_SIZE),
+            CELL_SIZE,
+            CELL_SIZE,
+            border_radius=6,
+        )
+        committed_cells[item_id] = preview
+        committed_cells_row.controls.append(preview)
+
+    def pick_item(item_id, label):
+        if selected_item_id["value"] is not None:
+            commit_current_picker()
+        selected_item_id["value"] = item_id
+        quantity_field.value = "1"
+        quantity_field.error_text = None
+        storage_items[item_id] = 1
+        picker_cell.border = None
+        picker_cell.content = build_item_preview(
+            item_id, names, raw_data, size=CELL_SIZE
+        )
+        picker_dropdown.visible = False
+        picker_search.value = ""
+        filter_picker_items()
+        quantity_controls.visible = True
+        add_button.disabled = False
+        refresh_storage_items()
+        filter_picker_items()
+        page.update()
+
+    def build_picker_list():
+        if picker_list_built["value"]:
+            return
+        picker_list_built["value"] = True
+        english_sorted_items = sorted(
+            names,
+            key=lambda item_id: (
+                (raw_data.get(item_id, {}).get("name") or {}).get("en")
+                or names.get(item_id, item_id)
+            ).casefold(),
+        )
+        for item_id in english_sorted_items:
+            label = names.get(item_id, item_id)
+            row = ft.Container(
+                content=ft.Row(
+                    [
+                        build_item_preview(item_id, names, raw_data, size=52),
+                        ft.Text(label, expand=True),
+                    ],
+                    spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                padding=6,
+                border_radius=6,
+                on_click=lambda e, iid=item_id, lbl=label: pick_item(iid, lbl),
+                ink=True,
+            )
+            picker_list_column.controls.append(row)
+            english_name = (
+                (raw_data.get(item_id, {}).get("name") or {}).get("en") or label
+            )
+            picker_entries.append(
+                (item_id, row, f"{english_name} {label} {item_id}".casefold())
+            )
+
+    async def toggle_picker(e):
+        build_picker_list()
+        picker_dropdown.visible = not picker_dropdown.visible
+        page.update()
+        if picker_dropdown.visible:
+            await picker_search.focus()
+
+    picker_control = build_hover_wrapper(
+        picker_cell,
+        CELL_SIZE,
+        CELL_SIZE,
+        border_radius=6,
+        on_tap=toggle_picker,
+    )
+    picker_search.on_change = filter_picker_items
+
+    def change_picker_quantity(e):
+        try:
+            quantity = int(quantity_field.value)
+            if quantity <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            quantity_field.error_text = "Positive integer"
+        else:
+            quantity_field.error_text = None
+            item_id = selected_item_id["value"]
+            if item_id:
+                storage_items[item_id] = quantity
+                refresh_storage_items()
+        page.update()
+
+    def adjust_picker_quantity(delta):
+        try:
+            quantity = int(quantity_field.value)
+        except (TypeError, ValueError):
+            quantity = 1
+        quantity_field.value = str(max(1, quantity + delta))
+        quantity_field.error_text = None
+        item_id = selected_item_id["value"]
+        if item_id:
+            storage_items[item_id] = int(quantity_field.value)
+            refresh_storage_items()
+        page.update()
+
+    quantity_field.on_change = change_picker_quantity
+    quantity_controls = ft.Row(
+        [
+            ft.IconButton(
+                icon=ft.Icons.REMOVE,
+                width=32,
+                height=32,
+                icon_size=18,
+                padding=0,
+                tooltip="Decrease by 1",
+                on_click=lambda e: adjust_picker_quantity(-1),
+            ),
+            quantity_field,
+            ft.IconButton(
+                icon=ft.Icons.ADD,
+                width=32,
+                height=32,
+                icon_size=18,
+                padding=0,
+                tooltip="Increase by 1",
+                on_click=lambda e: adjust_picker_quantity(1),
+            ),
+        ],
+        width=CELL_SIZE,
+        spacing=0,
+        visible=False,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
     def change_grid_sort(e):
         grid_sort_mode["value"] = (
             "value" if grid_sort_mode["value"] == "rarity" else "rarity"
@@ -105,13 +329,6 @@ def main(page: ft.Page):
         page.update()
 
     sort_button.on_click = change_grid_sort
-
-    def pick_item(item_id, label):
-        selected_item_id["value"] = item_id
-        selected_label.value = f"Selected: {label}"
-        add_button.disabled = False
-        matches_list.controls.clear()
-        page.update()
 
     def refresh_storage_items():
         storage_items_column.controls.clear()
@@ -148,43 +365,27 @@ def main(page: ft.Page):
         else:
             storage_items[item_id] = quantity
             e.control.error_text = None
+            if selected_item_id["value"] == item_id:
+                quantity_field.value = str(quantity)
         page.update()
 
     def remove_storage_item(item_id):
         storage_items.pop(item_id, None)
+        committed = committed_cells.pop(item_id, None)
+        if committed is not None:
+            committed_cells_row.controls.remove(committed)
+        if selected_item_id["value"] == item_id:
+            reset_picker()
+        filter_picker_items()
         refresh_storage_items()
         page.update()
 
     def add_storage_item(e):
-        item_id = selected_item_id["value"]
-        if not item_id:
+        if selected_item_id["value"] is None:
             return
-        try:
-            quantity = int(quantity_field.value)
-            if quantity <= 0:
-                raise ValueError
-        except (TypeError, ValueError):
-            quantity_field.error_text = "Enter a positive whole number"
-            page.update()
-            return
-
-        quantity_field.error_text = None
-        storage_items[item_id] = storage_items.get(item_id, 0) + quantity
-        refresh_storage_items()
-        page.update()
-
-    def on_search_change(e):
-        query = search_field.value or ""
-        matches_list.controls.clear()
-        if len(query) >= 2:
-            matches = find_item_id(query, names)[:15]
-            for item_id, label in matches:
-                matches_list.controls.append(
-                    ft.TextButton(
-                        content=label,
-                        on_click=lambda e, iid=item_id, lbl=label: pick_item(iid, lbl),
-                    )
-                )
+        commit_current_picker()
+        reset_picker()
+        filter_picker_items()
         page.update()
 
     async def on_calculate_click(e):
@@ -421,7 +622,6 @@ def main(page: ft.Page):
             grid_column.controls.append(sorted_grid)
             page.update()
 
-    search_field.on_change = on_search_change
     add_button.on_click = add_storage_item
     calculate_button.on_click = on_calculate_click
 
@@ -431,10 +631,19 @@ def main(page: ft.Page):
         content=ft.Column(
             [
                 ft.Text("Storage Calculator", size=24, weight=ft.FontWeight.BOLD),
-                search_field,
-                matches_list,
-                selected_label,
-                ft.Row([quantity_field, add_button]),
+                ft.Row(
+                    [
+                        ft.Column(
+                            [picker_control, quantity_controls, add_button],
+                            spacing=12,
+                            width=CELL_SIZE,
+                        ),
+                        committed_cells_row,
+                    ],
+                    spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                ),
+                picker_dropdown,
                 ft.Text("Items to store", weight=ft.FontWeight.BOLD),
                 storage_items_column,
                 calculate_button,
