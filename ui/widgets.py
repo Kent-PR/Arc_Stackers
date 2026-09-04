@@ -1,10 +1,18 @@
 """Storage widgets with rarity backgrounds and lazily cached item artwork."""
 import asyncio
+from functools import lru_cache
+from pathlib import Path
+
 import flet as ft
 
-from core.images import get_cached_image
+from core.images import get_cached_image_layers
 
 CELL_SIZE = 128
+CARD_CORNER_RADIUS_RATIO = 48 / 512
+FRAME_INSET_RATIO = 7 / 512
+ARTWORK_LEFT_RATIO = 62 / 512
+ARTWORK_TOP_RATIO = 0 / 512
+ARTWORK_SIZE_RATIO = 385 / 512
 COLUMNS = 4
 HOVER_BORDER_MARGIN = 3
 CELL_SLOT_SIZE = CELL_SIZE + HOVER_BORDER_MARGIN * 2
@@ -30,8 +38,78 @@ RARITY_RANK = {
     "legendary": 5,
 }
 DEFAULT_RARITY_COLOR = ft.Colors.GREY_400
+ITEM_CARD_BACKGROUND = "#090C19"
 REVEAL_COVER_COLOR = ft.Colors.GREY_800
 REVEAL_EDGE_WIDTH = 10
+FRAME_DIR = Path(__file__).resolve().parents[1] / "media"
+
+
+def card_corner_radius(size):
+    """Scale the 48 px Figma radius from its 512 px reference frame."""
+    return size * CARD_CORNER_RADIUS_RATIO
+
+
+@lru_cache(maxsize=5)
+def _rarity_frame_bytes(rarity):
+    """Load a tiny SVG once; return None for unknown/missing frames."""
+    frame_path = FRAME_DIR / f"{rarity}_frame.svg"
+    try:
+        return frame_path.read_bytes()
+    except OSError:
+        return None
+
+
+def _build_item_surface(
+    item_id, item_name, image_url, rarity, size, padding, font_size
+):
+    """Place the Figma rarity frame and item art over the game-dark surface."""
+    controls = [
+        ft.Container(width=size, height=size, bgcolor=ITEM_CARD_BACKGROUND),
+    ]
+    frame_bytes = _rarity_frame_bytes(rarity)
+    if frame_bytes:
+        controls.append(
+            ft.Image(
+                src=frame_bytes,
+                width=size,
+                height=size,
+                fit=ft.BoxFit.FILL,
+            )
+        )
+
+    else:
+        controls.append(
+            ft.Container(
+                width=size,
+                height=size,
+                border=ft.Border.all(
+                    max(1, size * FRAME_INSET_RATIO),
+                    RARITY_COLORS.get(rarity, DEFAULT_RARITY_COLOR),
+                ),
+                border_radius=card_corner_radius(size),
+            )
+        )
+
+    artwork_size = size * ARTWORK_SIZE_RATIO
+    artwork = ItemArtwork(
+        item_id=item_id,
+        item_name=item_name,
+        image_url=image_url,
+        size=artwork_size,
+        padding=padding,
+        font_size=font_size,
+    )
+    artwork.left = size * ARTWORK_LEFT_RATIO
+    artwork.top = size * ARTWORK_TOP_RATIO
+    controls.append(artwork)
+    return ft.Container(
+        width=size,
+        height=size,
+        bgcolor=ITEM_CARD_BACKGROUND,
+        border_radius=card_corner_radius(size),
+        clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+        content=ft.Stack(width=size, height=size, controls=controls),
+    )
 
 
 class ItemArtwork(ft.Stack):
@@ -75,12 +153,24 @@ class ItemArtwork(ft.Stack):
         self.running = False
 
     async def _load_image(self):
-        image_bytes = await asyncio.to_thread(
-            get_cached_image, self.item_id, self.image_url
+        image_layers = await asyncio.to_thread(
+            get_cached_image_layers, self.item_id, self.image_url
         )
-        if not image_bytes or not self.running:
+        if not image_layers or not self.running:
             return
-        self.controls = [
+        shadow_bytes, image_bytes = image_layers
+        controls = []
+        if shadow_bytes:
+            controls.append(
+                ft.Image(
+                    src=shadow_bytes,
+                    width=self.size,
+                    height=self.size,
+                    fit=ft.BoxFit.CONTAIN,
+                    exclude_from_semantics=True,
+                )
+            )
+        controls.append(
             ft.Image(
                 src=image_bytes,
                 width=self.size,
@@ -89,7 +179,8 @@ class ItemArtwork(ft.Stack):
                 semantics_label=self.item_name,
                 error_content=self._build_name_layer(),
             )
-        ]
+        )
+        self.controls = controls
         self.update()
 
 
@@ -145,20 +236,14 @@ def build_item_preview(item_id, names, item_data, size=52):
         longest_word = max((len(word) for word in item_name.split()), default=1)
         font_size = max(6, min(10, int((size - 8) / (longest_word * 0.7))))
         padding = 4
-    return ft.Container(
-        width=size,
-        height=size,
-        alignment=ft.Alignment.CENTER,
-        bgcolor=RARITY_COLORS.get(rarity, DEFAULT_RARITY_COLOR),
-        border_radius=max(4, size * 6 / CELL_SIZE),
-        content=ItemArtwork(
-            item_id=item_id,
-            item_name=item_name,
-            image_url=data.get("imageFilename"),
-            size=size,
-            padding=padding,
-            font_size=font_size,
-        ),
+    return _build_item_surface(
+        item_id=item_id,
+        item_name=item_name,
+        image_url=data.get("imageFilename"),
+        rarity=rarity,
+        size=size,
+        padding=padding,
+        font_size=font_size,
     )
 
 
@@ -304,14 +389,6 @@ def build_cell_grid(
     core.representations.cell_groups(). Returns a Flet Column containing
     the item-labelled grid and its cells in display order. item_data maps
     item ids to their raw JSON."""
-    color_of = {
-        g["occupant"]: RARITY_COLORS.get(
-            str(item_data.get(g["occupant"], {}).get("rarity", "")).lower(),
-            DEFAULT_RARITY_COLOR,
-        )
-        for g in groups
-    }
-
     # Flatten groups into individual cells, then establish a display order
     # independent of the optimizer and of the future selected UI language.
     cells = []
@@ -331,12 +408,6 @@ def build_cell_grid(
         row_controls = []
         for occupant, fill, capacity in row_cells:
             item_name = names.get(occupant, occupant)
-            target_color = color_of[occupant]
-            color_layer = ft.Container(
-                width=CELL_SIZE,
-                height=CELL_SIZE,
-                bgcolor=target_color,
-            )
             cover_layer = ft.Container(
                 left=-REVEAL_EDGE_WIDTH,
                 width=CELL_SIZE + REVEAL_EDGE_WIDTH,
@@ -358,10 +429,13 @@ def build_cell_grid(
             label_layer = ft.Stack(
                 visible=True,
                 controls=[
-                    ItemArtwork(
+                    _build_item_surface(
                         item_id=occupant,
                         item_name=item_name,
                         image_url=item_data.get(occupant, {}).get("imageFilename"),
+                        rarity=str(
+                            item_data.get(occupant, {}).get("rarity", "")
+                        ).lower(),
                         size=CELL_SIZE,
                         padding=16,
                         font_size=_name_font_size(item_name),
@@ -382,21 +456,24 @@ def build_cell_grid(
             )
             hover_border, on_enter, on_hover, on_exit = _build_hover_border(
                 border_radius=_proportional_outer_radius(
-                    6, CELL_SIZE, CELL_SIZE, HOVER_BORDER_MARGIN
+                    card_corner_radius(CELL_SIZE),
+                    CELL_SIZE,
+                    CELL_SIZE,
+                    HOVER_BORDER_MARGIN,
                 )
             )
             cell = ft.Container(
                     width=CELL_SIZE,
                     height=CELL_SIZE,
-                    bgcolor=target_color,
+                    bgcolor=ITEM_CARD_BACKGROUND,
                     opacity=0 if animate_colors else 1,
                     scale=0.75 if animate_colors else 1,
                     animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
                     animate_scale=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
-                    border_radius=6,
+                    border_radius=card_corner_radius(CELL_SIZE),
                     clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                     content=ft.Stack(
-                        [color_layer, label_layer, cover_layer]
+                        [label_layer, cover_layer]
                     ),
                 )
             cell_slot = ft.GestureDetector(

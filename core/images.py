@@ -17,7 +17,7 @@ IMAGE_DOWNLOAD_TIMEOUT = 20
 SHADOW_BLUR_RADIUS = 7
 SHADOW_OFFSET = (0, 5)
 SHADOW_OPACITY = 110
-SHADOW_CACHE_VERSION = 1
+SHADOW_CACHE_VERSION = 2
 
 _locks_guard = threading.Lock()
 _download_locks = {}
@@ -44,8 +44,8 @@ def _shadow_cache_path(original_path):
     )
 
 
-def _add_drop_shadow(image_bytes):
-    """Return a PNG with a soft shadow following the source alpha channel."""
+def _build_drop_shadow(image_bytes):
+    """Return a transparent PNG containing only the alpha-aware shadow."""
     with Image.open(io.BytesIO(image_bytes)) as source:
         source = source.convert("RGBA")
         blurred_alpha = source.getchannel("A").filter(
@@ -60,9 +60,8 @@ def _add_drop_shadow(image_bytes):
         shadow = Image.new("RGBA", source.size, (0, 0, 0, 0))
         shadow.putalpha(shifted_alpha)
 
-        rendered = Image.alpha_composite(shadow, source)
         output = io.BytesIO()
-        rendered.save(output, format="PNG")
+        shadow.save(output, format="PNG")
         return output.getvalue()
 
 
@@ -73,17 +72,17 @@ def _render_and_cache_shadow(original_path, image_bytes):
         if shadow_path.is_file() and shadow_path.stat().st_size:
             return shadow_path.read_bytes()
 
-        rendered_bytes = _add_drop_shadow(image_bytes)
+        rendered_bytes = _build_drop_shadow(image_bytes)
         temporary = shadow_path.with_suffix(shadow_path.suffix + ".part")
         temporary.write_bytes(rendered_bytes)
         temporary.replace(shadow_path)
         return rendered_bytes
     except (OSError, ValueError, UnidentifiedImageError):
-        return image_bytes
+        return None
 
 
-def get_cached_image(item_id, url):
-    """Download an image once and return its bytes, or ``None`` on failure.
+def get_cached_image_layers(item_id, url):
+    """Return ``(shadow, original)`` bytes, downloading and caching as needed.
 
     The URL hash in the filename automatically invalidates an old cached image
     when the data source changes its URL. A temporary file is renamed only
@@ -96,8 +95,10 @@ def get_cached_image(item_id, url):
     with _download_lock(url):
         try:
             if destination.is_file() and destination.stat().st_size:
-                return _render_and_cache_shadow(
-                    destination, destination.read_bytes()
+                image_bytes = destination.read_bytes()
+                return (
+                    _render_and_cache_shadow(destination, image_bytes),
+                    image_bytes,
                 )
 
             IMAGES_DIR.mkdir(parents=True, exist_ok=True)
@@ -117,6 +118,12 @@ def get_cached_image(item_id, url):
             temporary = destination.with_suffix(destination.suffix + ".part")
             temporary.write_bytes(image_bytes)
             temporary.replace(destination)
-            return _render_and_cache_shadow(destination, image_bytes)
+            return _render_and_cache_shadow(destination, image_bytes), image_bytes
         except (OSError, ValueError):
             return None
+
+
+def get_cached_image(item_id, url):
+    """Backward-compatible helper returning only the original image bytes."""
+    layers = get_cached_image_layers(item_id, url)
+    return layers[1] if layers else None

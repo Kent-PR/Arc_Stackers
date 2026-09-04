@@ -24,6 +24,7 @@ from ui.widgets import (
     build_cell_grid,
     build_hover_wrapper,
     build_item_preview,
+    card_corner_radius,
 )
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
@@ -120,7 +121,7 @@ def main(page: ft.Page):
         height=CELL_SIZE,
         alignment=ft.Alignment.CENTER,
         bgcolor=ft.Colors.GREY_900,
-        border_radius=6,
+        border_radius=card_corner_radius(CELL_SIZE),
         border=ft.Border.all(2, ft.Colors.GREY_600),
         content=ft.Column(
             [
@@ -204,7 +205,7 @@ def main(page: ft.Page):
             build_item_preview(item_id, names, raw_data, size=CELL_SIZE),
             CELL_SIZE,
             CELL_SIZE,
-            border_radius=6,
+            border_radius=card_corner_radius(CELL_SIZE),
         )
         preview_with_safe_area = ft.Container(
             content=preview,
@@ -364,7 +365,7 @@ def main(page: ft.Page):
         picker_cell,
         CELL_SIZE,
         CELL_SIZE,
-        border_radius=6,
+        border_radius=card_corner_radius(CELL_SIZE),
         on_tap=toggle_picker,
     )
     picker_control_with_safe_area = ft.Container(
