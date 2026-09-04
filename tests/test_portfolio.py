@@ -71,10 +71,12 @@ class PortfolioTests(unittest.TestCase):
         db.add_raw("cloth", 10)
         db.add_raw("plant", 15)
         db.add_recipe("bandage", 5, [("cloth", 1), ("plant", 1)])
+        progress = []
 
         result = compute_storage_portfolio(
             db, {"bandage": 100}, {},
             names={"bandage": "Bandage", "cloth": "Cloth", "plant": "Plant"},
+            on_progress=lambda completed, total: progress.append((completed, total)),
         )
 
         self.assertEqual(17, result["best"]["cost"])
@@ -83,6 +85,8 @@ class PortfolioTests(unittest.TestCase):
             "Cloth + Plant",
             result["best"]["recipe_choices"]["bandage"]["label"],
         )
+        self.assertEqual((0, 2), progress[0])
+        self.assertEqual((2, 2), progress[-1])
 
 
 if __name__ == "__main__":

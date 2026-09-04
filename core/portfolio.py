@@ -247,7 +247,7 @@ def _solve_material_portfolio(db, requested, raw_data, names):
     }
 
 
-def compute_storage_portfolio(db, requested, raw_data, names=None):
+def compute_storage_portfolio(db, requested, raw_data, names=None, on_progress=None):
     """Return the minimum-cell joint plan, including recipe alternatives.
 
     For every requested root item, all partial/full recipe expansions are
@@ -269,6 +269,10 @@ def compute_storage_portfolio(db, requested, raw_data, names=None):
             raise ValueError(
                 "There are too many combined crafting-tree variants for the current exact optimizer."
             )
+
+    completed_variants = 0
+    if on_progress:
+        on_progress(completed_variants, combination_count)
 
     best_result = None
     best_score = None
@@ -298,6 +302,9 @@ def compute_storage_portfolio(db, requested, raw_data, names=None):
                 if "too large" not in str(error).lower():
                     raise
                 skipped_variants += 1
+                completed_variants += 1
+                if on_progress:
+                    on_progress(completed_variants, combination_count)
                 continue
             solved_requirements[requirements_key] = result
         best = result["best"]
@@ -313,6 +320,9 @@ def compute_storage_portfolio(db, requested, raw_data, names=None):
                 "requirements": requirements,
                 "best": {**best, "recipe_choices": recipe_choices},
             }
+        completed_variants += 1
+        if on_progress:
+            on_progress(completed_variants, combination_count)
 
     if best_result is None:
         raise ValueError(
