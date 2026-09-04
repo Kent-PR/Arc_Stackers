@@ -36,6 +36,8 @@ def main(page: ft.Page):
     selected_item_id = {"value": None}  # mutable holder, simplest way to share state
     storage_items = {}
     animation_generation = {"value": 0}
+    grid_sort_mode = {"value": "rarity"}
+    last_grid_groups = {"value": None}
 
     search_field = ft.TextField(label="Search item", width=350, autofocus=True)
     matches_list = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, height=150)
@@ -51,7 +53,31 @@ def main(page: ft.Page):
         expand=True,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
     )
+    sort_button = ft.OutlinedButton(content="Sort: Rarity", disabled=True)
     results_column = ft.Column(spacing=8)
+
+    def change_grid_sort(e):
+        grid_sort_mode["value"] = (
+            "value" if grid_sort_mode["value"] == "rarity" else "rarity"
+        )
+        sort_button.content = (
+            "Sort: Value" if grid_sort_mode["value"] == "value" else "Sort: Rarity"
+        )
+        groups = last_grid_groups["value"]
+        if groups is not None:
+            animation_generation["value"] += 1
+            grid_column.controls.clear()
+            grid, _ = build_cell_grid(
+                groups,
+                names,
+                raw_data,
+                animate_colors=False,
+                sort_mode=grid_sort_mode["value"],
+            )
+            grid_column.controls.append(grid)
+        page.update()
+
+    sort_button.on_click = change_grid_sort
 
     def pick_item(item_id, label):
         selected_item_id["value"] = item_id
@@ -137,6 +163,8 @@ def main(page: ft.Page):
     async def on_calculate_click(e):
         animation_generation["value"] += 1
         current_generation = animation_generation["value"]
+        last_grid_groups["value"] = None
+        sort_button.disabled = True
         grid_column.controls.clear()
         results_column.controls.clear()
         if not storage_items:
@@ -204,6 +232,7 @@ def main(page: ft.Page):
                     raise CalculationCancelled
             except CalculationCancelled:
                 calculate_button.disabled = False
+                sort_button.disabled = True
                 grid_column.controls.clear()
                 grid_column.controls.append(
                     ft.Text("Calculation cancelled.", italic=True)
@@ -228,6 +257,8 @@ def main(page: ft.Page):
             return
 
         best = result["best"]
+        last_grid_groups["value"] = best["groups"]
+        sort_button.disabled = False
         results_column.controls.append(
             ft.Container(
                 content=ft.Column([
@@ -244,7 +275,11 @@ def main(page: ft.Page):
             )
         )
         grid, animated_cells = build_cell_grid(
-            best["groups"], names, raw_data, animate_colors=True
+            best["groups"],
+            names,
+            raw_data,
+            animate_colors=True,
+            sort_mode=grid_sort_mode["value"],
         )
         grid_column.controls.append(grid)
         if is_portfolio:
@@ -369,7 +404,14 @@ def main(page: ft.Page):
         ft.Row(
             [
                 ft.Container(
-                    content=grid_column,
+                    content=ft.Column(
+                        [
+                            ft.Row([sort_button], alignment=ft.MainAxisAlignment.END),
+                            grid_column,
+                        ],
+                        spacing=8,
+                        expand=True,
+                    ),
                     # Grid width + 20 px for the scrollbar + 20 px panel padding.
                     width=CELL_SLOT_SIZE * COLUMNS + 40,
                     padding=ft.Padding.only(right=20),
