@@ -179,7 +179,16 @@ def main(page: ft.Page):
         )
         grid_column.controls.append(grid)
         if is_portfolio:
-            results_column.controls.append(ft.Text("Coverage", weight=ft.FontWeight.BOLD))
+            results_column.controls.append(ft.Text("Storage form", weight=ft.FontWeight.BOLD))
+            for root_item, choice in best["recipe_choices"].items():
+                results_column.controls.append(
+                    ft.Text(
+                        f"{names.get(root_item, root_item)} → {choice['label']}"
+                    )
+                )
+            results_column.controls.append(
+                ft.Text("Material requirements", weight=ft.FontWeight.BOLD)
+            )
             for covered_item, coverage in best["coverage"].items():
                 excess = coverage["excess"]
                 suffix = f" (+{excess} excess)" if excess else ""
