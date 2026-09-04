@@ -22,6 +22,13 @@ RARITY_COLORS = {
     "epic": ft.Colors.PURPLE_400,
     "legendary": ft.Colors.AMBER_500,
 }
+RARITY_RANK = {
+    "common": 1,
+    "uncommon": 2,
+    "rare": 3,
+    "epic": 4,
+    "legendary": 5,
+}
 DEFAULT_RARITY_COLOR = ft.Colors.GREY_400
 REVEAL_COVER_COLOR = ft.Colors.GREY_800
 REVEAL_EDGE_WIDTH = 10
@@ -44,6 +51,15 @@ def _name_font_size(name):
     # Bold glyphs average less than this, so 0.75 leaves room for wide letters.
     size_for_word = int(available_width / (longest_word * 0.75))
     return max(10, min(size_for_label, size_for_word))
+
+
+def _cell_sort_key(occupant, names, item_data):
+    """Sort by descending rarity, then by the stable English item name."""
+    data = item_data.get(occupant, {})
+    rarity = str(data.get("rarity", "")).lower()
+    localized_names = data.get("name") or {}
+    english_name = localized_names.get("en") or names.get(occupant, occupant)
+    return -RARITY_RANK.get(rarity, 0), english_name.casefold(), occupant.casefold()
 
 
 def _build_hover_border():
@@ -151,11 +167,13 @@ def build_cell_grid(groups, names, item_data, animate_colors=False):
         for g in groups
     }
 
-    # flatten groups into an ordered list of individual cells
+    # Flatten groups into individual cells, then establish a display order
+    # independent of the optimizer and of the future selected UI language.
     cells = []
     for g in groups:
         for fill in g["fills"]:
             cells.append((g["occupant"], fill, g["capacity"]))
+    cells.sort(key=lambda cell: _cell_sort_key(cell[0], names, item_data))
 
     rows = []
     animated_cells = []
