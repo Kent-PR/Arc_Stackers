@@ -14,6 +14,12 @@ CELL_SIZE = 128
 COLUMNS = 4
 HOVER_BORDER_MARGIN = 3
 CELL_SLOT_SIZE = CELL_SIZE + HOVER_BORDER_MARGIN * 2
+GRID_CELLS_WIDTH = CELL_SLOT_SIZE * COLUMNS
+GRID_FRAME_PADDING = 8
+GRID_FRAME_BORDER_WIDTH = 4
+GRID_WIDTH = GRID_CELLS_WIDTH + 2 * (
+    GRID_FRAME_PADDING + GRID_FRAME_BORDER_WIDTH
+)
 
 RARITY_COLORS = {
     "common": ft.Colors.GREY_400,
@@ -74,15 +80,21 @@ def _cell_sort_key(occupant, fill, names, item_data, sort_mode="rarity"):
     return -RARITY_RANK.get(rarity, 0), *name_key
 
 
-def _build_hover_border():
+def _build_hover_border(
+    width=CELL_SLOT_SIZE,
+    height=CELL_SLOT_SIZE,
+    border_radius=9,
+    pointer_offset_x=0,
+    pointer_offset_y=0,
+):
     """Create a cursor-driven white/cyan/purple gradient ring."""
     transparent_cyan = ft.Colors.with_opacity(0, ft.Colors.CYAN_300)
     transparent_purple = ft.Colors.with_opacity(0, ft.Colors.PURPLE_300)
     white_base = ft.Container(
-        width=CELL_SLOT_SIZE,
-        height=CELL_SLOT_SIZE,
+        width=width,
+        height=height,
         bgcolor=ft.Colors.WHITE,
-        border_radius=9,
+        border_radius=border_radius,
         shadow=[
             ft.BoxShadow(blur_radius=10, spread_radius=1, color=ft.Colors.CYAN_300),
             ft.BoxShadow(blur_radius=12, spread_radius=1, color=ft.Colors.PURPLE_300),
@@ -90,9 +102,9 @@ def _build_hover_border():
     )
     def spot_layer():
         return ft.Container(
-            width=CELL_SLOT_SIZE,
-            height=CELL_SLOT_SIZE,
-            border_radius=9,
+            width=width,
+            height=height,
+            border_radius=border_radius,
             clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
             animate=ft.Animation(80, ft.AnimationCurve.EASE_OUT),
         )
@@ -101,8 +113,8 @@ def _build_hover_border():
     cyan_spots = [spot_layer() for _ in range(4)]
     border = ft.Stack(
         controls=[white_base, *purple_spots, *cyan_spots],
-        width=CELL_SLOT_SIZE,
-        height=CELL_SLOT_SIZE,
+        width=width,
+        height=height,
         visible=False,
         opacity=0,
         animate_opacity=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
@@ -110,23 +122,23 @@ def _build_hover_border():
     hover_state = {"generation": 0}
 
     def update_spots(e):
-        x = max(0, min(CELL_SLOT_SIZE, e.local_position.x))
-        y = max(0, min(CELL_SLOT_SIZE, e.local_position.y))
+        x = max(0, min(width, e.local_position.x + pointer_offset_x))
+        y = max(0, min(height, e.local_position.y + pointer_offset_y))
         projections = (
-            (0, y, x),
-            (CELL_SLOT_SIZE, y, CELL_SLOT_SIZE - x),
-            (x, 0, y),
-            (x, CELL_SLOT_SIZE, CELL_SLOT_SIZE - y),
+            (0, y, x, width),
+            (width, y, width - x, width),
+            (x, 0, y, height),
+            (x, height, height - y, height),
         )
 
-        for purple_spot, cyan_spot, (edge_x, edge_y, distance) in zip(
+        for purple_spot, cyan_spot, (edge_x, edge_y, distance, maximum) in zip(
             purple_spots, cyan_spots, projections
         ):
             center = ft.Alignment(
-                x=edge_x / CELL_SLOT_SIZE * 2 - 1,
-                y=edge_y / CELL_SLOT_SIZE * 2 - 1,
+                x=edge_x / width * 2 - 1,
+                y=edge_y / height * 2 - 1,
             )
-            proximity = 1 - distance / CELL_SLOT_SIZE
+            proximity = 1 - distance / maximum
             strength = 0.12 + 0.88 * proximity * proximity
             purple_spot.gradient = ft.RadialGradient(
                 center=center,
@@ -164,6 +176,42 @@ def _build_hover_border():
             border.update()
 
     return border, on_enter, update_spots, on_exit
+
+
+def _proportional_outer_radius(inner_radius, width, height, margin):
+    """Preserve the corner-radius ratio when expanding a hover outline."""
+    shortest_side = min(width, height)
+    return inner_radius * (shortest_side + margin * 2) / shortest_side
+
+
+def build_hover_wrapper(content, width, height, border_radius=8):
+    """Wrap an opaque control in the same external hover ring as grid cells."""
+    margin = HOVER_BORDER_MARGIN
+    hover_border, on_enter, on_hover, on_exit = _build_hover_border(
+        width=width + margin * 2,
+        height=height + margin * 2,
+        border_radius=_proportional_outer_radius(
+            border_radius, width, height, margin
+        ),
+        pointer_offset_x=margin,
+        pointer_offset_y=margin,
+    )
+    hover_border.left = -margin
+    hover_border.top = -margin
+    return ft.GestureDetector(
+        width=width,
+        height=height,
+        hover_interval=16,
+        on_enter=on_enter,
+        on_hover=on_hover,
+        on_exit=on_exit,
+        content=ft.Stack(
+            width=width,
+            height=height,
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[hover_border, content],
+        ),
+    )
 
 
 def build_cell_grid(
@@ -256,7 +304,11 @@ def build_cell_grid(
                     ),
                 ],
             )
-            hover_border, on_enter, on_hover, on_exit = _build_hover_border()
+            hover_border, on_enter, on_hover, on_exit = _build_hover_border(
+                border_radius=_proportional_outer_radius(
+                    6, CELL_SIZE, CELL_SIZE, HOVER_BORDER_MARGIN
+                )
+            )
             cell = ft.Container(
                     width=CELL_SIZE,
                     height=CELL_SIZE,
@@ -301,4 +353,11 @@ def build_cell_grid(
             row_controls.append(ft.Container(width=CELL_SLOT_SIZE, height=CELL_SLOT_SIZE))
         rows.append(ft.Row(row_controls, spacing=0))
 
-    return ft.Column(rows, spacing=0), animated_cells
+    framed_grid = ft.Container(
+        width=GRID_WIDTH,
+        content=ft.Column(rows, spacing=0),
+        padding=GRID_FRAME_PADDING,
+        border=ft.Border.all(GRID_FRAME_BORDER_WIDTH, ft.Colors.BLACK),
+        border_radius=14,
+    )
+    return framed_grid, animated_cells

@@ -18,9 +18,16 @@ from core.containers import build_reverse_index
 from core.fetch import ensure_data
 from core.loader import find_item_id, load_items
 from core.portfolio import CalculationCancelled, compute_storage_portfolio
-from ui.widgets import CELL_SIZE, CELL_SLOT_SIZE, COLUMNS, build_cell_grid
+from ui.widgets import (
+    CELL_SIZE,
+    GRID_WIDTH,
+    build_cell_grid,
+    build_hover_wrapper,
+)
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
+SORT_BUTTON_HEIGHT = 44
+SORT_BUTTON_RADIUS = SORT_BUTTON_HEIGHT / 2
 
 
 def main(page: ft.Page):
@@ -54,7 +61,23 @@ def main(page: ft.Page):
         expand=True,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
     )
-    sort_button = ft.OutlinedButton(content="Sort: Rarity", disabled=True)
+    sort_button = ft.OutlinedButton(
+        content="Sort: Rarity",
+        width=GRID_WIDTH,
+        height=SORT_BUTTON_HEIGHT,
+        disabled=True,
+        style=ft.ButtonStyle(
+            bgcolor=ft.Colors.GREY_900,
+            side=ft.BorderSide(0, ft.Colors.TRANSPARENT),
+            shape=ft.RoundedRectangleBorder(radius=SORT_BUTTON_RADIUS),
+        ),
+    )
+    sort_button_with_hover = build_hover_wrapper(
+        sort_button,
+        GRID_WIDTH,
+        SORT_BUTTON_HEIGHT,
+        border_radius=SORT_BUTTON_RADIUS,
+    )
     results_column = ft.Column(spacing=8)
 
     def change_grid_sort(e):
@@ -429,17 +452,20 @@ def main(page: ft.Page):
                 ft.Container(
                     content=ft.Column(
                         [
-                            ft.Row([sort_button], alignment=ft.MainAxisAlignment.END),
+                            sort_button_with_hover,
                             grid_column,
                         ],
                         spacing=8,
                         expand=True,
                     ),
-                    # Grid width + 20 px for the scrollbar + 20 px panel padding.
-                    width=CELL_SLOT_SIZE * COLUMNS + 40,
-                    padding=ft.Padding.only(right=20),
+                    # The extra 20 px belongs to the grid scrollbar. With no
+                    # trailing panel padding, its thumb sits at the same edge
+                    # as the container's divider border.
+                    width=GRID_WIDTH + 20,
+                    border=ft.Border.only(
+                        right=ft.BorderSide(1, ft.Colors.GREY_400)
+                    ),
                 ),
-                ft.VerticalDivider(width=1, thickness=1, color=ft.Colors.GREY_400),
                 input_panel,
             ],
             expand=True,
