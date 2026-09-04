@@ -4,6 +4,7 @@ once this skeleton is confirmed working end-to-end.
 """
 import asyncio
 import os
+import queue
 import random
 import sys
 
@@ -142,12 +143,58 @@ def main(page: ft.Page):
             return
         is_portfolio = len(storage_items) > 1
         if is_portfolio:
+            progress_bar = ft.ProgressBar(value=0, width=360)
+            progress_text = ft.Text("Preparing storage variants…", size=16)
+            progress_detail = ft.Text("0%", size=28, weight=ft.FontWeight.BOLD)
+            grid_column.controls.append(
+                ft.Container(
+                    content=ft.Column(
+                        [progress_detail, progress_bar, progress_text],
+                        spacing=12,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    alignment=ft.Alignment.CENTER,
+                    expand=True,
+                )
+            )
+            calculate_button.disabled = True
+            page.update()
+            progress_events = queue.SimpleQueue()
+
+            def report_progress(completed, total):
+                progress_events.put((completed, total))
+
+            calculation = asyncio.create_task(
+                asyncio.to_thread(
+                    compute_storage_portfolio,
+                    db,
+                    dict(storage_items),
+                    raw_data,
+                    names,
+                    report_progress,
+                )
+            )
             try:
-                result = compute_storage_portfolio(db, storage_items, raw_data, names=names)
+                while not calculation.done():
+                    latest = None
+                    while not progress_events.empty():
+                        latest = progress_events.get()
+                    if latest:
+                        completed, total = latest
+                        fraction = completed / total if total else 0
+                        progress_bar.value = fraction
+                        progress_detail.value = f"{fraction:.0%}"
+                        progress_text.value = f"Checked {completed} of {total} storage variants"
+                        page.update()
+                    await asyncio.sleep(0.05)
+                result = await calculation
             except ValueError as error:
+                calculate_button.disabled = False
                 results_column.controls.append(ft.Text(str(error), color=ft.Colors.RED_400))
                 page.update()
                 return
+            calculate_button.disabled = False
+            grid_column.controls.clear()
         else:
             item_id, n = next(iter(storage_items.items()))
             result = compute_storage(
