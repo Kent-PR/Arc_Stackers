@@ -36,6 +36,7 @@ def main(page: ft.Page):
     selected_item_id = {"value": None}  # mutable holder, simplest way to share state
     storage_items = {}
     animation_generation = {"value": 0}
+    active_reveal_generation = {"value": None}
     grid_sort_mode = {"value": "rarity"}
     last_grid_groups = {"value": None}
 
@@ -64,7 +65,10 @@ def main(page: ft.Page):
             "Sort: Value" if grid_sort_mode["value"] == "value" else "Sort: Rarity"
         )
         groups = last_grid_groups["value"]
-        if groups is not None:
+        # Rebuilding destroys the controls currently used by the reveal
+        # coroutine. During reveal, remember the requested mode and apply it
+        # once the final cell has finished instead.
+        if groups is not None and active_reveal_generation["value"] is None:
             animation_generation["value"] += 1
             grid_column.controls.clear()
             grid, _ = build_cell_grid(
@@ -163,6 +167,7 @@ def main(page: ft.Page):
     async def on_calculate_click(e):
         animation_generation["value"] += 1
         current_generation = animation_generation["value"]
+        active_reveal_generation["value"] = None
         last_grid_groups["value"] = None
         sort_button.disabled = True
         grid_column.controls.clear()
@@ -281,6 +286,8 @@ def main(page: ft.Page):
             animate_colors=True,
             sort_mode=grid_sort_mode["value"],
         )
+        reveal_sort_mode = grid_sort_mode["value"]
+        active_reveal_generation["value"] = current_generation
         grid_column.controls.append(grid)
         if is_portfolio:
             results_column.controls.append(ft.Text("Storage form", weight=ft.FontWeight.BOLD))
@@ -323,6 +330,8 @@ def main(page: ft.Page):
         if current_generation != animation_generation["value"]:
             return
         if not animated_cells:
+            if active_reveal_generation["value"] == current_generation:
+                active_reveal_generation["value"] = None
             return
 
         # Start the first grey cell immediately, then let the remaining grey
@@ -374,6 +383,20 @@ def main(page: ft.Page):
 
             await asyncio.sleep(0.35)
             cell_index += reveal_count
+
+        if active_reveal_generation["value"] == current_generation:
+            active_reveal_generation["value"] = None
+        if grid_sort_mode["value"] != reveal_sort_mode:
+            grid_column.controls.clear()
+            sorted_grid, _ = build_cell_grid(
+                last_grid_groups["value"],
+                names,
+                raw_data,
+                animate_colors=False,
+                sort_mode=grid_sort_mode["value"],
+            )
+            grid_column.controls.append(sorted_grid)
+            page.update()
 
     search_field.on_change = on_search_change
     add_button.on_click = add_storage_item
