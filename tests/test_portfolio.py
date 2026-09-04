@@ -66,6 +66,24 @@ class PortfolioTests(unittest.TestCase):
         self.assertEqual(1, result["best"]["cost"])
         self.assertEqual(4, result["best"]["stored"]["radio"])
 
+    def test_craftable_item_can_be_stored_as_recipe_components(self):
+        db = Database()
+        db.add_raw("cloth", 10)
+        db.add_raw("plant", 15)
+        db.add_recipe("bandage", 5, [("cloth", 1), ("plant", 1)])
+
+        result = compute_storage_portfolio(
+            db, {"bandage": 100}, {},
+            names={"bandage": "Bandage", "cloth": "Cloth", "plant": "Plant"},
+        )
+
+        self.assertEqual(17, result["best"]["cost"])
+        self.assertEqual({"cloth": 100, "plant": 100}, result["requirements"])
+        self.assertEqual(
+            "Cloth + Plant",
+            result["best"]["recipe_choices"]["bandage"]["label"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,9 +5,14 @@ output of a recycled/salvaged source at once. One Broken Handheld Radio can
 therefore cover both Sensors and Wires without being counted twice.
 """
 from heapq import heappop, heappush
+from itertools import product
+from math import ceil
+
+from .representations import describe_rep, enumerate_representations
 
 
 MAX_STATES = 300_000
+MAX_REPRESENTATION_COMBINATIONS = 20_000
 
 
 def _build_actions(db, requested, raw_data):
@@ -78,31 +83,79 @@ def _build_actions(db, requested, raw_data):
     return item_ids, demands, actions
 
 
-def compute_storage_portfolio(db, requested, raw_data, names=None):
-    """Return the minimum-cell joint storage plan for ``item_id -> quantity``.
-
-    Each transition represents one physical storage cell, filled with between
-    one and ``stackSize`` units of a direct item or recyclable source. Search
-    states cap coverage at the requested amounts, keeping the state space finite.
-    """
-    requested = {item: int(qty) for item, qty in requested.items() if int(qty) > 0}
-    if not requested:
-        return None
+def _solve_material_portfolio(db, requested, raw_data, names):
+    """Solve one already-expanded set of material requirements."""
     names = names or {}
     item_ids, demands, actions = _build_actions(db, requested, raw_data)
     start = (0,) * len(item_ids)
-    goal = demands
-    best_score = {start: (0, 0)}  # cells, physical source units
+    direct_stacks = tuple(db.stack_size[item_id] for item_id in item_ids)
+
+    def direct_cells(state):
+        return sum(
+            ceil(max(0, demand - covered) / stack)
+            for demand, covered, stack in zip(demands, state, direct_stacks)
+        )
+
+    # Direct storage is the baseline. Search only source-cell actions whose
+    # combined output density can beat one direct cell.
+    container_actions = [
+        action for action in actions
+        if "direct" not in action.get("method_counts", {})
+        and (
+            sum(
+                gain / stack for gain, stack in zip(action["coverage"], direct_stacks)
+            ) > 1
+            or direct_cells(start) - direct_cells(tuple(
+                min(demand, gain) for demand, gain in zip(demands, action["coverage"])
+            )) > 1
+        )
+    ]
+    # Every action costs exactly one cell. Drop an action when another action
+    # covers at least as much of every requested material while using no more
+    # physical source units. Such an action can never improve either part of
+    # the (cells, units) score and only multiplies the number of search states.
+    nondominated_actions = []
+    for index, action in enumerate(container_actions):
+        capped = tuple(
+            min(demand, gain) for demand, gain in zip(demands, action["coverage"])
+        )
+        dominated = False
+        for other_index, other in enumerate(container_actions):
+            if index == other_index or other["quantity"] > action["quantity"]:
+                continue
+            other_capped = tuple(
+                min(demand, gain)
+                for demand, gain in zip(demands, other["coverage"])
+            )
+            if all(right >= left for left, right in zip(capped, other_capped)) and (
+                other["quantity"] < action["quantity"] or other_capped != capped
+            ):
+                dominated = True
+                break
+        if not dominated:
+            nondominated_actions.append(action)
+    container_actions = nondominated_actions
+    search_score = {start: (0, 0)}  # source cells, physical source units
     previous = {}
     queue = [(0, 0, start)]
+    best_state = start
+    best_score = (direct_cells(start), sum(demands))
 
     while queue:
         cells, units, state = heappop(queue)
-        if best_score.get(state) != (cells, units):
+        if search_score.get(state) != (cells, units):
             continue
-        if state == goal:
-            break
-        for action_index, action in enumerate(actions):
+        remaining_units = sum(
+            max(0, demand - covered) for demand, covered in zip(demands, state)
+        )
+        complete_score = (cells + direct_cells(state), units + remaining_units)
+        if complete_score < best_score:
+            best_score = complete_score
+            best_state = state
+        if cells + 1 >= best_score[0]:
+            continue
+
+        for action_index, action in enumerate(container_actions):
             next_state = tuple(
                 min(demand, have + gain)
                 for demand, have, gain in zip(demands, state, action["coverage"])
@@ -110,24 +163,37 @@ def compute_storage_portfolio(db, requested, raw_data, names=None):
             if next_state == state:
                 continue
             next_score = (cells + 1, units + action["quantity"])
-            if next_score < best_score.get(next_state, (float("inf"), float("inf"))):
-                best_score[next_state] = next_score
+            if next_score < search_score.get(next_state, (float("inf"), float("inf"))):
+                search_score[next_state] = next_score
                 previous[next_state] = (state, action_index)
                 heappush(queue, (*next_score, next_state))
-                if len(best_score) > MAX_STATES:
+                if len(search_score) > MAX_STATES:
                     raise ValueError(
                         "The joint request is too large for the current exact optimizer."
                     )
 
-    if goal not in best_score:
-        return None
-
     chosen = []
-    state = goal
+    state = best_state
     while state != start:
         state, action_index = previous[state]
-        chosen.append(actions[action_index])
+        chosen.append(container_actions[action_index])
     chosen.reverse()
+
+    # Finish uncovered demand with ordinary directly stored stacks.
+    for index, (item_id, demand, covered) in enumerate(zip(item_ids, demands, best_state)):
+        remaining = max(0, demand - covered)
+        if not remaining:
+            continue
+        coverage = [0] * len(item_ids)
+        coverage[index] = remaining
+        chosen.append({
+            "source": item_id,
+            "method": "direct",
+            "method_counts": {"direct": remaining},
+            "quantity": remaining,
+            "stack_size": direct_stacks[index],
+            "coverage": tuple(coverage),
+        })
 
     stored = {}
     produced = {item_id: 0 for item_id in item_ids}
@@ -179,3 +245,78 @@ def compute_storage_portfolio(db, requested, raw_data, names=None):
             "allocations": allocations,
         },
     }
+
+
+def compute_storage_portfolio(db, requested, raw_data, names=None):
+    """Return the minimum-cell joint plan, including recipe alternatives.
+
+    For every requested root item, all partial/full recipe expansions are
+    considered first. Each combined material requirement is then solved by the
+    coproduct-aware recycle/salvage optimizer above.
+    """
+    requested = {item: int(qty) for item, qty in requested.items() if int(qty) > 0}
+    if not requested:
+        return None
+    names = names or {}
+    root_items = tuple(requested)
+    representation_options = []
+    combination_count = 1
+    for item_id in root_items:
+        reps = enumerate_representations(db, item_id, reverse_index={})
+        representation_options.append(reps)
+        combination_count *= len(reps)
+        if combination_count > MAX_REPRESENTATION_COMBINATIONS:
+            raise ValueError(
+                "There are too many combined crafting-tree variants for the current exact optimizer."
+            )
+
+    best_result = None
+    best_score = None
+    solved_requirements = {}
+    skipped_variants = 0
+    for chosen_reps in product(*representation_options):
+        requirements = {}
+        recipe_choices = {}
+        for root_item, rep in zip(root_items, chosen_reps):
+            multiplier = requested[root_item]
+            recipe_choices[root_item] = {
+                "label": describe_rep(rep, names, lang="en"),
+                "terms": rep,
+            }
+            for term_key, quantity_per_root in rep.items():
+                material = term_key[1]
+                requirements[material] = (
+                    requirements.get(material, 0) + quantity_per_root * multiplier
+                )
+
+        requirements_key = tuple(sorted(requirements.items()))
+        result = solved_requirements.get(requirements_key)
+        if result is None:
+            try:
+                result = _solve_material_portfolio(db, requirements, raw_data, names)
+            except ValueError as error:
+                if "too large" not in str(error).lower():
+                    raise
+                skipped_variants += 1
+                continue
+            solved_requirements[requirements_key] = result
+        best = result["best"]
+        score = (
+            best["cost"],
+            sum(best["stored"].values()),
+            sum(entry["excess"] for entry in best["coverage"].values()),
+        )
+        if best_score is None or score < best_score:
+            best_score = score
+            best_result = {
+                "requested": requested,
+                "requirements": requirements,
+                "best": {**best, "recipe_choices": recipe_choices},
+            }
+
+    if best_result is None:
+        raise ValueError(
+            "The joint request is too large for the current optimizer."
+        )
+    best_result["skipped_variants"] = skipped_variants
+    return best_result
