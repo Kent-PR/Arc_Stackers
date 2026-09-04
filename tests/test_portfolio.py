@@ -1,10 +1,22 @@
 import unittest
 
 from core.models import Database
-from core.portfolio import compute_storage_portfolio
+from core.portfolio import CalculationCancelled, compute_storage_portfolio
 
 
 class PortfolioTests(unittest.TestCase):
+    def test_calculation_can_be_cancelled(self):
+        db = Database()
+        db.add_raw("item", 10)
+
+        with self.assertRaises(CalculationCancelled):
+            compute_storage_portfolio(
+                db,
+                {"item": 10},
+                {},
+                should_cancel=lambda: True,
+            )
+
     def test_one_source_covers_two_requested_materials(self):
         db = Database()
         db.add_raw("sensors", 5)

@@ -15,13 +15,23 @@ MAX_STATES = 300_000
 MAX_REPRESENTATION_COMBINATIONS = 20_000
 
 
-def _build_actions(db, requested, raw_data):
+class CalculationCancelled(Exception):
+    """Raised when a caller requests cooperative optimizer cancellation."""
+
+
+def _check_cancelled(should_cancel):
+    if should_cancel and should_cancel():
+        raise CalculationCancelled
+
+
+def _build_actions(db, requested, raw_data, should_cancel=None):
     item_ids = tuple(requested)
     demands = tuple(requested[item_id] for item_id in item_ids)
     actions = []
 
     source_ids = list(dict.fromkeys([*item_ids, *raw_data]))
     for source_id in source_ids:
+        _check_cancelled(should_cancel)
         source_stack = db.stack_size.get(source_id)
         if not source_stack:
             continue
@@ -45,6 +55,7 @@ def _build_actions(db, requested, raw_data):
         frontier = {zero_coverage: zero_counts}
         best_for_source = {}
         for quantity in range(1, source_stack + 1):
+            _check_cancelled(should_cancel)
             next_frontier = {}
             for coverage, counts in frontier.items():
                 for mode_index, (_, per_unit) in enumerate(modes):
@@ -83,10 +94,12 @@ def _build_actions(db, requested, raw_data):
     return item_ids, demands, actions
 
 
-def _solve_material_portfolio(db, requested, raw_data, names):
+def _solve_material_portfolio(db, requested, raw_data, names, should_cancel=None):
     """Solve one already-expanded set of material requirements."""
     names = names or {}
-    item_ids, demands, actions = _build_actions(db, requested, raw_data)
+    item_ids, demands, actions = _build_actions(
+        db, requested, raw_data, should_cancel=should_cancel
+    )
     start = (0,) * len(item_ids)
     direct_stacks = tuple(db.stack_size[item_id] for item_id in item_ids)
 
@@ -116,6 +129,7 @@ def _solve_material_portfolio(db, requested, raw_data, names):
     # the (cells, units) score and only multiplies the number of search states.
     nondominated_actions = []
     for index, action in enumerate(container_actions):
+        _check_cancelled(should_cancel)
         capped = tuple(
             min(demand, gain) for demand, gain in zip(demands, action["coverage"])
         )
@@ -142,6 +156,7 @@ def _solve_material_portfolio(db, requested, raw_data, names):
     best_score = (direct_cells(start), sum(demands))
 
     while queue:
+        _check_cancelled(should_cancel)
         cells, units, state = heappop(queue)
         if search_score.get(state) != (cells, units):
             continue
@@ -247,7 +262,9 @@ def _solve_material_portfolio(db, requested, raw_data, names):
     }
 
 
-def compute_storage_portfolio(db, requested, raw_data, names=None, on_progress=None):
+def compute_storage_portfolio(
+    db, requested, raw_data, names=None, on_progress=None, should_cancel=None
+):
     """Return the minimum-cell joint plan, including recipe alternatives.
 
     For every requested root item, all partial/full recipe expansions are
@@ -262,6 +279,7 @@ def compute_storage_portfolio(db, requested, raw_data, names=None, on_progress=N
     representation_options = []
     combination_count = 1
     for item_id in root_items:
+        _check_cancelled(should_cancel)
         reps = enumerate_representations(db, item_id, reverse_index={})
         representation_options.append(reps)
         combination_count *= len(reps)
@@ -279,6 +297,7 @@ def compute_storage_portfolio(db, requested, raw_data, names=None, on_progress=N
     solved_requirements = {}
     skipped_variants = 0
     for chosen_reps in product(*representation_options):
+        _check_cancelled(should_cancel)
         requirements = {}
         recipe_choices = {}
         for root_item, rep in zip(root_items, chosen_reps):
@@ -297,7 +316,13 @@ def compute_storage_portfolio(db, requested, raw_data, names=None, on_progress=N
         result = solved_requirements.get(requirements_key)
         if result is None:
             try:
-                result = _solve_material_portfolio(db, requirements, raw_data, names)
+                result = _solve_material_portfolio(
+                    db,
+                    requirements,
+                    raw_data,
+                    names,
+                    should_cancel=should_cancel,
+                )
             except ValueError as error:
                 if "too large" not in str(error).lower():
                     raise
