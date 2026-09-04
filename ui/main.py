@@ -7,6 +7,7 @@ import os
 import queue
 import random
 import sys
+import threading
 
 import flet as ft
 
@@ -16,7 +17,7 @@ from core.analysis import compute_storage
 from core.containers import build_reverse_index
 from core.fetch import ensure_data
 from core.loader import find_item_id, load_items
-from core.portfolio import compute_storage_portfolio
+from core.portfolio import CalculationCancelled, compute_storage_portfolio
 from ui.widgets import CELL_SIZE, CELL_SLOT_SIZE, COLUMNS, build_cell_grid
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
@@ -146,10 +147,20 @@ def main(page: ft.Page):
             progress_bar = ft.ProgressBar(value=0, width=360)
             progress_text = ft.Text("Preparing storage variants…", size=16)
             progress_detail = ft.Text("0%", size=28, weight=ft.FontWeight.BOLD)
+            cancel_event = threading.Event()
+            cancel_button = ft.OutlinedButton(content="Cancel calculation")
+
+            def cancel_calculation(e):
+                cancel_event.set()
+                cancel_button.disabled = True
+                progress_text.value = "Cancelling…"
+                page.update()
+
+            cancel_button.on_click = cancel_calculation
             grid_column.controls.append(
                 ft.Container(
                     content=ft.Column(
-                        [progress_detail, progress_bar, progress_text],
+                        [progress_detail, progress_bar, progress_text, cancel_button],
                         spacing=12,
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -172,6 +183,7 @@ def main(page: ft.Page):
                     raw_data,
                     names,
                     report_progress,
+                    cancel_event.is_set,
                 )
             )
             try:
@@ -188,6 +200,16 @@ def main(page: ft.Page):
                         page.update()
                     await asyncio.sleep(0.05)
                 result = await calculation
+                if cancel_event.is_set():
+                    raise CalculationCancelled
+            except CalculationCancelled:
+                calculate_button.disabled = False
+                grid_column.controls.clear()
+                grid_column.controls.append(
+                    ft.Text("Calculation cancelled.", italic=True)
+                )
+                page.update()
+                return
             except ValueError as error:
                 calculate_button.disabled = False
                 results_column.controls.append(ft.Text(str(error), color=ft.Colors.RED_400))
