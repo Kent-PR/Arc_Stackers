@@ -351,7 +351,11 @@ def main(page: ft.Page):
         page.update()
         await picker_search.focus()
 
-    def close_picker_dropdown(e=None):
+    async def close_picker_dropdown(e=None):
+        # TextField.on_tap_outside fires before a clicked list row receives
+        # its on_click event. Let that event finish before hiding the subtree,
+        # otherwise the row disappears before it can select the item.
+        await asyncio.sleep(0.05)
         if picker_dropdown.visible:
             picker_dropdown.visible = False
             page.update()
