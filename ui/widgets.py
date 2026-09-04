@@ -1,14 +1,8 @@
-"""Storage cell grid widget - renders a fixed-width grid of squares, one per
-storage cell, colored by item rarity and labelled with its fill
-(e.g. "5/5"). Used by the Storage Calculator screen (and later, the Home
-dashboard / Crafting Calculator - same visual language everywhere).
-
-TODO (future, once item images are wired up): replace the plain colored
-square with the item's icon (from imageFilename / CDN), keeping rarity as
-the shared visual language for the square border/background.
-"""
+"""Storage widgets with rarity backgrounds and lazily cached item artwork."""
 import asyncio
 import flet as ft
+
+from core.images import get_cached_image
 
 CELL_SIZE = 128
 COLUMNS = 4
@@ -38,6 +32,65 @@ RARITY_RANK = {
 DEFAULT_RARITY_COLOR = ft.Colors.GREY_400
 REVEAL_COVER_COLOR = ft.Colors.GREY_800
 REVEAL_EDGE_WIDTH = 10
+
+
+class ItemArtwork(ft.Stack):
+    """Show the item name until its image is available, then show only it."""
+
+    def __init__(self, item_id, item_name, image_url, size, padding, font_size):
+        super().__init__(width=size, height=size)
+        self.item_id = item_id
+        self.item_name = item_name
+        self.image_url = image_url
+        self.size = size
+        self.padding = padding
+        self.font_size = font_size
+        self.running = False
+        self.name_layer = self._build_name_layer()
+        self.controls = [self.name_layer]
+
+    def _build_name_layer(self):
+        return ft.Container(
+            width=self.size,
+            height=self.size,
+            padding=self.padding,
+            alignment=ft.Alignment.CENTER,
+            content=ft.Text(
+                self.item_name,
+                size=self.font_size,
+                weight=ft.FontWeight.BOLD,
+                text_align=ft.TextAlign.CENTER,
+                color=ft.Colors.WHITE,
+                max_lines=4,
+                overflow=ft.TextOverflow.ELLIPSIS,
+            ),
+        )
+
+    def did_mount(self):
+        self.running = True
+        if self.image_url:
+            self.page.run_task(self._load_image)
+
+    def will_unmount(self):
+        self.running = False
+
+    async def _load_image(self):
+        image_bytes = await asyncio.to_thread(
+            get_cached_image, self.item_id, self.image_url
+        )
+        if not image_bytes or not self.running:
+            return
+        self.controls = [
+            ft.Image(
+                src=image_bytes,
+                width=self.size,
+                height=self.size,
+                fit=ft.BoxFit.CONTAIN,
+                semantics_label=self.item_name,
+                error_content=self._build_name_layer(),
+            )
+        ]
+        self.update()
 
 
 def _name_font_size(name):
@@ -81,7 +134,7 @@ def _cell_sort_key(occupant, fill, names, item_data, sort_mode="rarity"):
 
 
 def build_item_preview(item_id, names, item_data, size=52):
-    """Build a compact rarity cell with a name and no quantity text."""
+    """Build a rarity-backed preview that replaces its name with artwork."""
     data = item_data.get(item_id, {})
     rarity = str(data.get("rarity", "")).lower()
     item_name = names.get(item_id, item_id)
@@ -95,18 +148,16 @@ def build_item_preview(item_id, names, item_data, size=52):
     return ft.Container(
         width=size,
         height=size,
-        padding=padding,
         alignment=ft.Alignment.CENTER,
         bgcolor=RARITY_COLORS.get(rarity, DEFAULT_RARITY_COLOR),
         border_radius=max(4, size * 6 / CELL_SIZE),
-        content=ft.Text(
-            item_name,
-            size=font_size,
-            weight=ft.FontWeight.BOLD,
-            text_align=ft.TextAlign.CENTER,
-            color=ft.Colors.WHITE,
-            max_lines=4,
-            overflow=ft.TextOverflow.ELLIPSIS,
+        content=ItemArtwork(
+            item_id=item_id,
+            item_name=item_name,
+            image_url=data.get("imageFilename"),
+            size=size,
+            padding=padding,
+            font_size=font_size,
         ),
     )
 
@@ -307,20 +358,13 @@ def build_cell_grid(
             label_layer = ft.Stack(
                 visible=True,
                 controls=[
-                    ft.Container(
-                        width=CELL_SIZE,
-                        height=CELL_SIZE,
+                    ItemArtwork(
+                        item_id=occupant,
+                        item_name=item_name,
+                        image_url=item_data.get(occupant, {}).get("imageFilename"),
+                        size=CELL_SIZE,
                         padding=16,
-                        alignment=ft.Alignment.CENTER,
-                        content=ft.Text(
-                            item_name,
-                            size=_name_font_size(item_name),
-                            weight=ft.FontWeight.BOLD,
-                            text_align=ft.TextAlign.CENTER,
-                            color=ft.Colors.WHITE,
-                            max_lines=4,
-                            overflow=ft.TextOverflow.ELLIPSIS,
-                        ),
+                        font_size=_name_font_size(item_name),
                     ),
                     ft.Container(
                         width=CELL_SIZE,

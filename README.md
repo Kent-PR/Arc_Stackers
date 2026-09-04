@@ -40,6 +40,10 @@ project folder, so there's nothing data-related to ever commit. Subsequent
 runs use the cached copy and only check for updates once a day (or on
 demand - see `core/fetch.ensure_data(force_check=True)`).
 
+Item images are fetched lazily from each JSON file's `imageFilename` URL and
+kept in the same OS cache. Until an image is available (or if it fails), the
+UI keeps showing the item name over its rarity-colored background.
+
 Cache location: `platformdirs.user_cache_dir("arc-storage-optimizer")`
 (e.g. `%LOCALAPPDATA%\arc-storage-optimizer\Cache` on Windows).
 
