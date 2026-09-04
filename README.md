@@ -16,6 +16,8 @@ core/               # pure logic, zero printing, zero UI - shared by everything
                       describe_rep(), fully_expanded_raw()  (the search engine)
   containers.py       build_reverse_index(), best_containers_for(),
                        scan_all_materials()  (recycle/salvage lookups)
+  portfolio.py        compute_storage_portfolio() - joint multi-item storage
+                       optimisation with shared recycle/salvage outputs
   analysis.py         compute_storage(), compute_crafting_naive_vs_optimal()
                        (UI-facing, one call = everything a screen needs)
 
@@ -61,3 +63,6 @@ Please keep this attribution if you fork/redistribute.
   history. Rarity controls item colors in the storage grid; foundIn is
   earmarked for a future "which loot
   container drops this" feature - not built yet).
+- The Storage Calculator accepts multiple requested items. Joint plans credit
+  every useful output of a recycled/salvaged source once, so one physical item
+  can satisfy several requested materials without being double-counted.
