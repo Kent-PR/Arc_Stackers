@@ -73,7 +73,13 @@ def _rarity_frame_bytes(rarity):
 
 
 def _build_item_surface(
-    item_id, item_name, image_url, rarity, size, padding, font_size
+    item_id,
+    item_name,
+    image_url,
+    rarity,
+    size,
+    padding,
+    font_size,
 ):
     """Place the Figma rarity frame and item art over the game-dark surface."""
     controls = [
