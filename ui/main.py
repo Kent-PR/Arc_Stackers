@@ -76,24 +76,15 @@ def main(page: ft.Page):
     db, names, raw_data = load_items(items_dir, lang="en")
     reverse_index = build_reverse_index(db, raw_data)
 
-    selected_item_id = {"value": None}  # mutable holder, simplest way to share state
     storage_items = {}
     animation_generation = {"value": 0}
     active_reveal_generation = {"value": None}
     grid_sort_mode = {"value": "rarity"}
     last_grid_groups = {"value": None}
 
-    quantity_field = ft.TextField(
-        value="1",
-        expand=True,
-        dense=True,
-        text_align=ft.TextAlign.CENTER,
-        keyboard_type=ft.KeyboardType.NUMBER,
-    )
     add_button = ft.Button(
         content="Add item",
         width=CELL_SIZE,
-        disabled=True,
     )
     calculate_button = ft.Button(content="Calculate storage", disabled=True)
     grid_column = ft.Column(
@@ -186,26 +177,8 @@ def main(page: ft.Page):
         if e is not None:
             page.update()
 
-    def reset_picker():
-        selected_item_id["value"] = None
-        quantity_field.value = "1"
-        quantity_field.error_text = None
-        quantity_controls.visible = False
-        add_button.disabled = True
-        picker_cell.border = ft.Border.all(2, ft.Colors.GREY_600)
-        picker_cell.content = ft.Column(
-            [
-                ft.Icon(ft.Icons.ADD, size=30, color=ft.Colors.GREY_400),
-                ft.Text("Choose item", color=ft.Colors.GREY_400),
-            ],
-            spacing=4,
-            alignment=ft.MainAxisAlignment.CENTER,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
-    def commit_current_picker():
-        item_id = selected_item_id["value"]
-        if not item_id or item_id in committed_cells:
+    def commit_item(item_id):
+        if item_id in committed_cells:
             return
         preview = build_hover_wrapper(
             build_item_preview(item_id, names, raw_data, size=CELL_SIZE),
@@ -294,23 +267,14 @@ def main(page: ft.Page):
         committed_cells_row.controls.append(card)
 
     def pick_item(item_id, label):
-        if selected_item_id["value"] is not None:
-            commit_current_picker()
-        selected_item_id["value"] = item_id
-        quantity_field.value = "1"
-        quantity_field.error_text = None
+        if item_id in storage_items:
+            return
         storage_items[item_id] = 1
-        picker_cell.border = None
-        picker_cell.content = build_item_preview(
-            item_id, names, raw_data, size=CELL_SIZE
-        )
+        commit_item(item_id)
         picker_dropdown.visible = False
         picker_search.value = ""
         filter_picker_items()
-        quantity_controls.visible = True
-        add_button.disabled = False
         refresh_storage_state()
-        filter_picker_items()
         page.update()
 
     def build_picker_list():
@@ -380,63 +344,6 @@ def main(page: ft.Page):
     picker_search.on_change = filter_picker_items
     picker_search.on_tap_outside = close_picker_dropdown
 
-    def change_picker_quantity(e):
-        try:
-            quantity = int(quantity_field.value)
-            if quantity <= 0:
-                raise ValueError
-        except (TypeError, ValueError):
-            quantity_field.error_text = "Positive integer"
-        else:
-            quantity_field.error_text = None
-            item_id = selected_item_id["value"]
-            if item_id:
-                storage_items[item_id] = quantity
-                refresh_storage_state()
-        page.update()
-
-    def adjust_picker_quantity(delta):
-        try:
-            quantity = int(quantity_field.value)
-        except (TypeError, ValueError):
-            quantity = 1
-        quantity_field.value = str(max(1, quantity + delta))
-        quantity_field.error_text = None
-        item_id = selected_item_id["value"]
-        if item_id:
-            storage_items[item_id] = int(quantity_field.value)
-            refresh_storage_state()
-        page.update()
-
-    quantity_field.on_change = change_picker_quantity
-    quantity_controls = ft.Row(
-        [
-            ft.IconButton(
-                icon=ft.Icons.REMOVE,
-                width=32,
-                height=32,
-                icon_size=18,
-                padding=0,
-                tooltip="Decrease by 1",
-                on_click=lambda e: adjust_picker_quantity(-1),
-            ),
-            quantity_field,
-            ft.IconButton(
-                icon=ft.Icons.ADD,
-                width=32,
-                height=32,
-                icon_size=18,
-                padding=0,
-                tooltip="Increase by 1",
-                on_click=lambda e: adjust_picker_quantity(1),
-            ),
-        ],
-        width=CELL_SIZE,
-        spacing=0,
-        visible=False,
-        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-    )
-
     def change_grid_sort(e):
         grid_sort_mode["value"] = (
             "value" if grid_sort_mode["value"] == "rarity" else "rarity"
@@ -471,18 +378,8 @@ def main(page: ft.Page):
         committed = committed_cells.pop(item_id, None)
         if committed is not None:
             committed_cells_row.controls.remove(committed)
-        if selected_item_id["value"] == item_id:
-            reset_picker()
         filter_picker_items()
         refresh_storage_state()
-        page.update()
-
-    def add_storage_item(e):
-        if selected_item_id["value"] is None:
-            return
-        commit_current_picker()
-        reset_picker()
-        filter_picker_items()
         page.update()
 
     async def on_calculate_click(e):
@@ -743,7 +640,7 @@ def main(page: ft.Page):
             grid_column.controls.append(sorted_grid)
             page.update()
 
-    add_button.on_click = add_storage_item
+    add_button.on_click = toggle_picker
     calculate_button.on_click = on_calculate_click
 
     input_panel = ft.Container(
@@ -757,7 +654,6 @@ def main(page: ft.Page):
                         ft.Column(
                             [
                                 picker_control_with_safe_area,
-                                quantity_controls,
                                 add_button,
                             ],
                             spacing=12,
