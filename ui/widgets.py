@@ -19,6 +19,9 @@ FOOTER_BOTTOM_MARGIN_RATIO = 8 / 512
 FOOTER_CORNER_RADIUS_RATIO = 40 / 512
 COLUMNS = 4
 HOVER_BORDER_MARGIN = 4
+HOVER_GAP = 2
+ARTWORK_HOVER_SCALE = 1.04
+ARTWORK_HOVER_DURATION_MS = 200
 CELL_SLOT_SIZE = CELL_SIZE + HOVER_BORDER_MARGIN * 2
 GRID_CELLS_WIDTH = CELL_SLOT_SIZE * COLUMNS
 GRID_FRAME_PADDING = 8
@@ -147,6 +150,13 @@ class ItemArtwork(ft.Stack):
         self.padding = padding
         self.font_size = font_size
         self.running = False
+        self.image_loaded = False
+        self.hovered = False
+        self.scale = 1
+        self.animate_scale = ft.Animation(
+            ARTWORK_HOVER_DURATION_MS,
+            ft.AnimationCurve.EASE_IN_OUT,
+        )
         self.name_layer = self._build_name_layer()
         self.controls = [self.name_layer]
 
@@ -174,6 +184,13 @@ class ItemArtwork(ft.Stack):
 
     def will_unmount(self):
         self.running = False
+
+    def set_hovered(self, hovered):
+        """Animate loaded artwork without scaling its text placeholder."""
+        self.hovered = hovered
+        if self.image_loaded:
+            self.scale = ARTWORK_HOVER_SCALE if hovered else 1
+            self.update()
 
     async def _load_image(self):
         image_layers = await asyncio.to_thread(
@@ -204,6 +221,8 @@ class ItemArtwork(ft.Stack):
             )
         )
         self.controls = controls
+        self.image_loaded = True
+        self.scale = ARTWORK_HOVER_SCALE if self.hovered else 1
         self.update()
 
 
@@ -374,6 +393,33 @@ def _proportional_outer_radius(inner_radius, width, height, margin):
     return inner_radius * (shortest_side + margin * 2) / shortest_side
 
 
+def _build_hover_gap(width, height, border_radius, gap=HOVER_GAP):
+    """Opaque spacer that separates content from the hover glow."""
+    return ft.Container(
+        left=-gap,
+        top=-gap,
+        width=width + gap * 2,
+        height=height + gap * 2,
+        bgcolor=ITEM_CARD_BACKGROUND,
+        border_radius=_proportional_outer_radius(
+            border_radius, width, height, gap
+        ),
+    )
+
+
+def _artwork_hover_handlers(artwork, on_enter, on_hover, on_exit):
+    """Combine the hover-ring handlers with artwork scale animation."""
+    def enter(e):
+        artwork.set_hovered(True)
+        on_enter(e)
+
+    async def exit(e):
+        artwork.set_hovered(False)
+        await on_exit(e)
+
+    return enter, on_hover, exit
+
+
 def build_hover_wrapper(content, width, height, border_radius=8, on_tap=None):
     """Wrap an opaque control in the same external hover ring as grid cells."""
     margin = HOVER_BORDER_MARGIN
@@ -388,6 +434,7 @@ def build_hover_wrapper(content, width, height, border_radius=8, on_tap=None):
     )
     hover_border.left = -margin
     hover_border.top = -margin
+    hover_gap = _build_hover_gap(width, height, border_radius)
     return ft.GestureDetector(
         width=width,
         height=height,
@@ -400,7 +447,7 @@ def build_hover_wrapper(content, width, height, border_radius=8, on_tap=None):
             width=width,
             height=height,
             clip_behavior=ft.ClipBehavior.NONE,
-            controls=[hover_border, content],
+            controls=[hover_border, hover_gap, content],
         ),
     )
 
@@ -449,20 +496,26 @@ def build_cell_grid(
                     ],
                     stops=[0, REVEAL_EDGE_WIDTH / (CELL_SIZE + REVEAL_EDGE_WIDTH), 1],
             )
+            item_surface = _build_item_surface(
+                item_id=occupant,
+                item_name=item_name,
+                image_url=item_data.get(occupant, {}).get("imageFilename"),
+                rarity=str(
+                    item_data.get(occupant, {}).get("rarity", "")
+                ).lower(),
+                size=CELL_SIZE,
+                padding=16,
+                font_size=_name_font_size(item_name),
+            )
+            artwork = next(
+                control
+                for control in item_surface.content.controls
+                if isinstance(control, ItemArtwork)
+            )
             label_layer = ft.Stack(
                 visible=True,
                 controls=[
-                    _build_item_surface(
-                        item_id=occupant,
-                        item_name=item_name,
-                        image_url=item_data.get(occupant, {}).get("imageFilename"),
-                        rarity=str(
-                            item_data.get(occupant, {}).get("rarity", "")
-                        ).lower(),
-                        size=CELL_SIZE,
-                        padding=16,
-                        font_size=_name_font_size(item_name),
-                    ),
+                    item_surface,
                     ft.Container(
                         right=12,
                         top=CELL_SIZE * (
@@ -486,6 +539,16 @@ def build_cell_grid(
                     CELL_SIZE,
                     HOVER_BORDER_MARGIN,
                 )
+            )
+            hover_gap = _build_hover_gap(
+                CELL_SIZE,
+                CELL_SIZE,
+                card_corner_radius(CELL_SIZE),
+            )
+            hover_gap.left = HOVER_BORDER_MARGIN - HOVER_GAP
+            hover_gap.top = HOVER_BORDER_MARGIN - HOVER_GAP
+            on_enter, on_hover, on_exit = _artwork_hover_handlers(
+                artwork, on_enter, on_hover, on_exit
             )
             cell = ft.Container(
                     width=CELL_SIZE,
@@ -514,6 +577,7 @@ def build_cell_grid(
                     clip_behavior=ft.ClipBehavior.NONE,
                     controls=[
                         hover_border,
+                        hover_gap,
                         ft.Container(
                             left=HOVER_BORDER_MARGIN,
                             top=HOVER_BORDER_MARGIN,
