@@ -91,10 +91,11 @@ def _trail_color(progress):
 
 
 def _cover_trail_color(progress):
-    """Interpolate transparent purple -> purple -> white for the wipe."""
+    """Interpolate dark purple -> pronounced cyan -> white for the wipe."""
     stops = (
-        (0.0, (192, 132, 252, 0)),
-        (0.24, (192, 132, 252, 235)),
+        (0.0, (126, 68, 190, 0)),
+        (0.18, (126, 68, 190, 235)),
+        (0.70, (103, 232, 249, 255)),
         (1.0, (255, 255, 255, 255)),
     )
     for (left_at, left), (right_at, right) in zip(stops, stops[1:]):
