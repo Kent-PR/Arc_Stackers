@@ -8,7 +8,9 @@ import flet as ft
 from core.images import get_cached_image_layers
 from ui.reveal import (
     REVEAL_COVER_DURATION_MS,
+    REVEAL_COVER_EDGE,
     REVEAL_FADE_MS,
+    reveal_cover_webp,
     reveal_border_webp,
 )
 
@@ -52,8 +54,6 @@ RARITY_RANK = {
 DEFAULT_RARITY_COLOR = ft.Colors.GREY_400
 ITEM_CARD_BACKGROUND = "#090C19"
 ITEM_CARD_FOOTER_COLOR = "#141725"
-REVEAL_COVER_COLOR = ft.Colors.GREY_800
-REVEAL_EDGE_WIDTH = 10
 FRAME_DIR = Path(__file__).resolve().parents[1] / "media"
 
 
@@ -490,25 +490,23 @@ def build_cell_grid(
         for occupant, fill in row_cells:
             item_name = names.get(occupant, occupant)
             cover_layer = ft.Container(
-                left=-REVEAL_EDGE_WIDTH,
-                width=CELL_SIZE + REVEAL_EDGE_WIDTH,
+                left=-REVEAL_COVER_EDGE,
+                width=CELL_SIZE + REVEAL_COVER_EDGE,
                 height=CELL_SIZE,
-                bgcolor=REVEAL_COVER_COLOR,
+                bgcolor=ITEM_CARD_BACKGROUND,
                 visible=animate_colors,
                 animate_position=ft.Animation(
                     REVEAL_COVER_DURATION_MS,
                     ft.AnimationCurve.EASE_IN_OUT,
                 ),
             )
-            cover_blur_gradient = ft.LinearGradient(
-                    begin=ft.Alignment.CENTER_LEFT,
-                    end=ft.Alignment.CENTER_RIGHT,
-                    colors=[
-                        ft.Colors.with_opacity(0, REVEAL_COVER_COLOR),
-                        REVEAL_COVER_COLOR,
-                        REVEAL_COVER_COLOR,
-                    ],
-                    stops=[0, REVEAL_EDGE_WIDTH / (CELL_SIZE + REVEAL_EDGE_WIDTH), 1],
+            cover_gradient = ft.Image(
+                src=reveal_cover_webp(CELL_SIZE),
+                width=CELL_SIZE,
+                height=CELL_SIZE,
+                fit=ft.BoxFit.FILL,
+                visible=False,
+                exclude_from_semantics=True,
             )
             item_surface = _build_item_surface(
                 item_id=occupant,
@@ -594,7 +592,7 @@ def build_cell_grid(
                     border_radius=card_corner_radius(CELL_SIZE),
                     clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                     content=ft.Stack(
-                        [label_layer, cover_layer]
+                        [label_layer, cover_layer, cover_gradient]
                     ),
                 )
             cell_slot = ft.GestureDetector(
@@ -625,7 +623,7 @@ def build_cell_grid(
                 (
                     cell,
                     cover_layer,
-                    cover_blur_gradient,
+                    cover_gradient,
                     label_layer,
                     reveal_border,
                 )
