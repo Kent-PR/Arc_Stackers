@@ -158,7 +158,7 @@ def reveal_border_webp(size, radius):
     for frame_index in range(REVEAL_FRAME_COUNT):
         moving_frames = REVEAL_FRAME_COUNT - REVEAL_FINAL_HOLD_FRAMES
         elapsed = min(frame_index / (moving_frames - 1), 1)
-        head = elapsed
+        head = elapsed * elapsed * (3 - 2 * elapsed)  # EASE_IN_OUT
         tail = elapsed * REVEAL_TAIL_PROGRESS
         start = round(tail * (len(points) - 1))
         end = round(head * (len(points) - 1))
