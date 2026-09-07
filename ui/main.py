@@ -21,14 +21,15 @@ from core.portfolio import CalculationCancelled, compute_storage_portfolio
 from ui.widgets import (
     CELL_SIZE,
     GRID_WIDTH,
-    REVEAL_EDGE_WIDTH,
     build_cell_grid,
     build_hover_wrapper,
     build_item_preview,
     card_corner_radius,
 )
 from ui.reveal import (
+    REVEAL_COVER_DELAY_MS,
     REVEAL_COVER_DURATION_MS,
+    REVEAL_COVER_EDGE,
     REVEAL_DURATION_MS,
 )
 
@@ -89,12 +90,12 @@ def main(page: ft.Page):
         text_align=ft.TextAlign.CENTER,
         keyboard_type=ft.KeyboardType.NUMBER,
     )
-    add_button = ft.ElevatedButton(
+    add_button = ft.Button(
         content="Add item",
         width=CELL_SIZE,
         disabled=True,
     )
-    calculate_button = ft.ElevatedButton(content="Calculate storage", disabled=True)
+    calculate_button = ft.Button(content="Calculate storage", disabled=True)
     grid_column = ft.Column(
         [ft.Text("Select an item and calculate to display its storage grid.", italic=True)],
         spacing=8,
@@ -690,11 +691,12 @@ def main(page: ft.Page):
             reveal_batch = animated_cells[cell_index:cell_index + reveal_count]
 
             # The cover remains stationary while the perimeter line travels.
-            for _, cover_layer, cover_blur_gradient, _, reveal_border in reveal_batch:
-                cover_layer.gradient = cover_blur_gradient
-                cover_layer.left = -REVEAL_EDGE_WIDTH
+            for _, cover_layer, cover_gradient, _, reveal_border in reveal_batch:
+                cover_layer.left = -REVEAL_COVER_EDGE
                 cover_layer.visible = True
                 cover_layer.update()
+                cover_gradient.visible = False
+                cover_gradient.update()
                 reveal_border.opacity = 1
                 reveal_border.visible = True
                 reveal_border.update()
@@ -704,18 +706,25 @@ def main(page: ft.Page):
                 return
 
             # Fade the completed line while the grey cover moves away.
-            for _, cover_layer, _, _, reveal_border in reveal_batch:
+            for _, _, cover_gradient, _, reveal_border in reveal_batch:
                 reveal_border.opacity = 0
                 reveal_border.update()
+                cover_gradient.visible = True
+                cover_gradient.update()
+
+            await asyncio.sleep(REVEAL_COVER_DELAY_MS / 1000)
+            for _, cover_layer, _, _, _ in reveal_batch:
                 cover_layer.left = CELL_SIZE
                 cover_layer.update()
 
             await asyncio.sleep(REVEAL_COVER_DURATION_MS / 1000)
             if current_generation != animation_generation["value"]:
                 return
-            for _, cover_layer, _, _, reveal_border in reveal_batch:
+            for _, cover_layer, cover_gradient, _, reveal_border in reveal_batch:
                 cover_layer.visible = False
                 cover_layer.update()
+                cover_gradient.visible = False
+                cover_gradient.update()
                 reveal_border.visible = False
                 reveal_border.update()
             cell_index += reveal_count
