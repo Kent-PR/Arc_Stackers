@@ -8,6 +8,9 @@ from PIL import Image, ImageDraw
 
 
 REVEAL_COVER_DURATION_MS = 500
+REVEAL_COVER_DELAY_MS = 50
+REVEAL_COVER_EDGE = 10
+REVEAL_GRADIENT_OVERSHOOT_RATIO = 0.5
 REVEAL_DURATION_MS = 500
 REVEAL_FADE_MS = 200
 REVEAL_FRAME_COUNT = 25
@@ -85,6 +88,64 @@ def _trail_color(progress):
                 round(a + (b - a) * amount) for a, b in zip(left, right)
             )
     return stops[-1][1]
+
+
+def _cover_trail_color(progress):
+    """Interpolate transparent purple -> purple -> white for the wipe."""
+    stops = (
+        (0.0, (192, 132, 252, 0)),
+        (0.24, (192, 132, 252, 235)),
+        (1.0, (255, 255, 255, 255)),
+    )
+    for (left_at, left), (right_at, right) in zip(stops, stops[1:]):
+        if progress <= right_at:
+            amount = (progress - left_at) / (right_at - left_at)
+            return tuple(
+                round(a + (b - a) * amount) for a, b in zip(left, right)
+            )
+    return stops[-1][1]
+
+
+@lru_cache(maxsize=4)
+def reveal_cover_webp(size):
+    """Return a transparent white-to-purple wipe with a slower trailing edge."""
+    scale = SUPERSAMPLE
+    scaled_size = size * scale
+    frames = []
+    for frame_index in range(REVEAL_FRAME_COUNT):
+        elapsed = frame_index / (REVEAL_FRAME_COUNT - 1)
+        head = 1 - (1 - elapsed) ** 3  # fast white leading edge
+        tail = elapsed * elapsed * (3 - 2 * elapsed)  # slower smooth tail
+        head_x = head * scaled_size * (1 + REVEAL_GRADIENT_OVERSHOOT_RATIO)
+        tail_x = tail * scaled_size
+
+        frame = Image.new("RGBA", (scaled_size, scaled_size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(frame)
+        for x in range(scaled_size):
+            if x > head_x:
+                continue
+            elif x < tail_x:
+                continue
+            elif head_x == tail_x:
+                color = (255, 255, 255, 255)
+            else:
+                color = _cover_trail_color((x - tail_x) / (head_x - tail_x))
+            draw.line((x, 0, x, scaled_size), fill=color)
+
+        frames.append(frame.resize((size, size), Image.Resampling.LANCZOS))
+
+    output = io.BytesIO()
+    frames[0].save(
+        output,
+        format="WEBP",
+        save_all=True,
+        append_images=frames[1:],
+        duration=REVEAL_COVER_DURATION_MS // REVEAL_FRAME_COUNT,
+        loop=1,
+        lossless=True,
+        method=4,
+    )
+    return output.getvalue()
 
 
 @lru_cache(maxsize=8)
