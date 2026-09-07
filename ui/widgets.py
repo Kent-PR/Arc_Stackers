@@ -21,7 +21,7 @@ COLUMNS = 4
 HOVER_BORDER_MARGIN = 4
 HOVER_GAP = 2
 ARTWORK_HOVER_SCALE = 1.04
-ARTWORK_HOVER_DURATION_MS = 200
+ARTWORK_HOVER_DURATION_MS = 100
 CELL_SLOT_SIZE = CELL_SIZE + HOVER_BORDER_MARGIN * 2
 GRID_CELLS_WIDTH = CELL_SLOT_SIZE * COLUMNS
 GRID_FRAME_PADDING = 8
@@ -152,7 +152,7 @@ class ItemArtwork(ft.Stack):
         self.running = False
         self.image_loaded = False
         self.hovered = False
-        self.scale = 1
+        self.scale = ft.Scale(scale=1, alignment=ft.Alignment.TOP_RIGHT)
         self.animate_scale = ft.Animation(
             ARTWORK_HOVER_DURATION_MS,
             ft.AnimationCurve.EASE_IN_OUT,
@@ -189,7 +189,10 @@ class ItemArtwork(ft.Stack):
         """Animate loaded artwork without scaling its text placeholder."""
         self.hovered = hovered
         if self.image_loaded:
-            self.scale = ARTWORK_HOVER_SCALE if hovered else 1
+            self.scale = ft.Scale(
+                scale=ARTWORK_HOVER_SCALE if hovered else 1,
+                alignment=ft.Alignment.TOP_RIGHT,
+            )
             self.update()
 
     async def _load_image(self):
@@ -222,7 +225,10 @@ class ItemArtwork(ft.Stack):
         )
         self.controls = controls
         self.image_loaded = True
-        self.scale = ARTWORK_HOVER_SCALE if self.hovered else 1
+        self.scale = ft.Scale(
+            scale=ARTWORK_HOVER_SCALE if self.hovered else 1,
+            alignment=ft.Alignment.TOP_RIGHT,
+        )
         self.update()
 
 
