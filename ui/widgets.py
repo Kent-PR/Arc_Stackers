@@ -6,6 +6,11 @@ from pathlib import Path
 import flet as ft
 
 from core.images import get_cached_image_layers
+from ui.reveal import (
+    REVEAL_COVER_DURATION_MS,
+    REVEAL_FADE_MS,
+    reveal_border_webp,
+)
 
 CELL_SIZE = 128
 CARD_CORNER_RADIUS_RATIO = 48 / 512
@@ -490,7 +495,10 @@ def build_cell_grid(
                 height=CELL_SIZE,
                 bgcolor=REVEAL_COVER_COLOR,
                 visible=animate_colors,
-                animate_position=ft.Animation(400, ft.AnimationCurve.EASE_IN_OUT),
+                animate_position=ft.Animation(
+                    REVEAL_COVER_DURATION_MS,
+                    ft.AnimationCurve.EASE_IN_OUT,
+                ),
             )
             cover_blur_gradient = ft.LinearGradient(
                     begin=ft.Alignment.CENTER_LEFT,
@@ -546,6 +554,25 @@ def build_cell_grid(
                     HOVER_BORDER_MARGIN,
                 )
             )
+            reveal_border = ft.Image(
+                src=reveal_border_webp(CELL_SLOT_SIZE, round(
+                    _proportional_outer_radius(
+                        card_corner_radius(CELL_SIZE),
+                        CELL_SIZE,
+                        CELL_SIZE,
+                        HOVER_BORDER_MARGIN,
+                    )
+                )),
+                width=CELL_SLOT_SIZE,
+                height=CELL_SLOT_SIZE,
+                fit=ft.BoxFit.FILL,
+                visible=False,
+                opacity=1,
+                animate_opacity=ft.Animation(
+                    REVEAL_FADE_MS, ft.AnimationCurve.LINEAR
+                ),
+                exclude_from_semantics=True,
+            )
             hover_gap = _build_hover_gap(
                 CELL_SIZE,
                 CELL_SIZE,
@@ -583,6 +610,7 @@ def build_cell_grid(
                     clip_behavior=ft.ClipBehavior.NONE,
                     controls=[
                         hover_border,
+                        reveal_border,
                         hover_gap,
                         ft.Container(
                             left=HOVER_BORDER_MARGIN,
@@ -594,7 +622,13 @@ def build_cell_grid(
             )
             row_controls.append(cell_slot)
             animated_cells.append(
-                (cell, cover_layer, cover_blur_gradient, label_layer)
+                (
+                    cell,
+                    cover_layer,
+                    cover_blur_gradient,
+                    label_layer,
+                    reveal_border,
+                )
             )
         # pad the last row with empty placeholders so the grid stays 4-wide
         while len(row_controls) < COLUMNS:

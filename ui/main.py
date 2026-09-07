@@ -21,10 +21,15 @@ from core.portfolio import CalculationCancelled, compute_storage_portfolio
 from ui.widgets import (
     CELL_SIZE,
     GRID_WIDTH,
+    REVEAL_EDGE_WIDTH,
     build_cell_grid,
     build_hover_wrapper,
     build_item_preview,
     card_corner_radius,
+)
+from ui.reveal import (
+    REVEAL_COVER_DURATION_MS,
+    REVEAL_DURATION_MS,
 )
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
@@ -651,13 +656,13 @@ def main(page: ft.Page):
 
         # Start the first grey cell immediately, then let the remaining grey
         # cells appear in parallel with the later color-reveal sequence.
-        first_cell, _, _, _ = animated_cells[0]
+        first_cell, _, _, _, _ = animated_cells[0]
         first_cell.opacity = 1
         first_cell.scale = 1
         first_cell.update()
 
         async def reveal_remaining_grey_cells():
-            for cell, _, _, _ in animated_cells[1:]:
+            for cell, _, _, _, _ in animated_cells[1:]:
                 await asyncio.sleep(0.02)
                 if current_generation != animation_generation["value"]:
                     return
@@ -684,19 +689,35 @@ def main(page: ft.Page):
             )
             reveal_batch = animated_cells[cell_index:cell_index + reveal_count]
 
-            for _, cover_layer, cover_blur_gradient, _ in reveal_batch:
+            # The cover remains stationary while the perimeter line travels.
+            for _, cover_layer, cover_blur_gradient, _, reveal_border in reveal_batch:
                 cover_layer.gradient = cover_blur_gradient
+                cover_layer.left = -REVEAL_EDGE_WIDTH
+                cover_layer.visible = True
+                cover_layer.update()
+                reveal_border.opacity = 1
+                reveal_border.visible = True
+                reveal_border.update()
+
+            await asyncio.sleep(REVEAL_DURATION_MS / 1000)
+            if current_generation != animation_generation["value"]:
+                return
+
+            # Fade the completed line while the grey cover moves away.
+            for _, cover_layer, _, _, reveal_border in reveal_batch:
+                reveal_border.opacity = 0
+                reveal_border.update()
                 cover_layer.left = CELL_SIZE
                 cover_layer.update()
 
-            await asyncio.sleep(0.4)
+            await asyncio.sleep(REVEAL_COVER_DURATION_MS / 1000)
             if current_generation != animation_generation["value"]:
                 return
-            for _, cover_layer, _, label_layer in reveal_batch:
+            for _, cover_layer, _, _, reveal_border in reveal_batch:
                 cover_layer.visible = False
                 cover_layer.update()
-
-            await asyncio.sleep(0.35)
+                reveal_border.visible = False
+                reveal_border.update()
             cell_index += reveal_count
 
         if active_reveal_generation["value"] == current_generation:
