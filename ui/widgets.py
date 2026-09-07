@@ -155,7 +155,7 @@ class ItemArtwork(ft.Stack):
         self.scale = ft.Scale(scale=1, alignment=ft.Alignment.TOP_RIGHT)
         self.animate_scale = ft.Animation(
             ARTWORK_HOVER_DURATION_MS,
-            ft.AnimationCurve.EASE_IN_OUT,
+            ft.AnimationCurve.EASE_OUT_CUBIC,
         )
         self.name_layer = self._build_name_layer()
         self.controls = [self.name_layer]
@@ -562,8 +562,8 @@ def build_cell_grid(
                     bgcolor=ITEM_CARD_BACKGROUND,
                     opacity=0 if animate_colors else 1,
                     scale=0.75 if animate_colors else 1,
-                    animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
-                    animate_scale=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+                    animate_opacity=ft.Animation(100, ft.AnimationCurve.EASE_OUT),
+                    animate_scale=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
                     border_radius=card_corner_radius(CELL_SIZE),
                     clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                     content=ft.Stack(
