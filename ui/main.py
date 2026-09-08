@@ -17,7 +17,6 @@ from core.analysis import compute_storage
 from core.containers import build_reverse_index
 from core.dashboard import (
     available_languages,
-    best_dismantling_examples,
     best_storage_examples,
 )
 from core.fetch import ensure_data
@@ -53,14 +52,14 @@ PICKER_HIDDEN_TYPES = {
     "Topside Material",
     "Nature",
 }
-HOME_CARD_WIDTH = 248
 HOME_PREVIEW_SIZE = 96
 HOME_ITEM_COUNT = 5
 LANGUAGE_LABELS = {
-    "da": "Dansk",
-    "de": "Deutsch",
     "en": "English",
+    "ru": "Русский",
     "es": "Español",
+    "de": "Deutsch",
+    "da": "Dansk",
     "fr": "Français",
     "he": "עברית",
     "hr": "Hrvatski",
@@ -72,7 +71,6 @@ LANGUAGE_LABELS = {
     "pl": "Polski",
     "pt": "Português",
     "pt-BR": "Português (Brasil)",
-    "ru": "Русский",
     "sr": "Srpski",
     "tr": "Türkçe",
     "uk": "Українська",
@@ -781,9 +779,21 @@ def main(page: ft.Page):
                 [
                     ft.Row(
                         [
-                            build_item_preview(source, names, raw_data, size=HOME_PREVIEW_SIZE),
+                            build_item_preview(
+                                source,
+                                names,
+                                raw_data,
+                                size=HOME_PREVIEW_SIZE,
+                                quantity=1,
+                            ),
                             ft.Icon(ft.Icons.ARROW_FORWARD, color=ft.Colors.CYAN_300),
-                            build_item_preview(material, names, raw_data, size=HOME_PREVIEW_SIZE),
+                            build_item_preview(
+                                material,
+                                names,
+                                raw_data,
+                                size=HOME_PREVIEW_SIZE,
+                                quantity=finding["yield_per_source"],
+                            ),
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -809,42 +819,9 @@ def main(page: ft.Page):
             ),
         )
 
-    def build_dismantling_card(example):
-        method_label = "Recycle" if example["method"] == "recyclesInto" else "Salvage"
-        output_label = ", ".join(
-            f"{quantity} × {item_name(material)}"
-            for material, quantity in example["yields"].items()
-        )
-        return ft.Container(
-            width=HOME_CARD_WIDTH,
-            padding=14,
-            border_radius=14,
-            bgcolor="#111622",
-            border=ft.Border.all(1, "#263247"),
-            content=ft.Column(
-                [
-                    build_item_preview(
-                        example["source"], names, raw_data, size=HOME_PREVIEW_SIZE
-                    ),
-                    ft.Text(item_name(example["source"]), weight=ft.FontWeight.BOLD, size=15),
-                    ft.Text(
-                        f"−{example['saved_percent']}% space in large batches",
-                        color=ft.Colors.GREEN_300,
-                        weight=ft.FontWeight.BOLD,
-                    ),
-                    ft.Text(f"{method_label}: {output_label}", size=12, color=ft.Colors.GREY_400),
-                ],
-                spacing=8,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
-        )
-
     def build_home_view():
         storage_findings = best_storage_examples(
             db, reverse_index, limit=HOME_ITEM_COUNT
-        )
-        dismantling_findings = best_dismantling_examples(
-            db, raw_data, limit=HOME_ITEM_COUNT
         )
         language_dropdown = ft.Dropdown(
             value="en",
@@ -919,16 +896,6 @@ def main(page: ft.Page):
                     spacing=12,
                     intrinsic_height=True,
                     vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-                ),
-                ft.Text("Better dismantled", size=22, weight=ft.FontWeight.BOLD),
-                ft.Text(
-                    "These items take less space as their recycled materials when stacks fill up.",
-                    color=ft.Colors.GREY_400,
-                ),
-                ft.Row(
-                    [build_dismantling_card(example) for example in dismantling_findings],
-                    spacing=12,
-                    scroll=ft.ScrollMode.AUTO,
                 ),
             ],
             spacing=12,
