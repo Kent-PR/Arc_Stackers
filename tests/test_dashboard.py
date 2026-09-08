@@ -28,6 +28,7 @@ class DashboardTests(unittest.TestCase):
         examples = best_storage_examples(db, build_reverse_index(db, raw))
         self.assertEqual([5, 4], examples[0]["raw_cell_fills"])
         self.assertEqual(80, examples[0]["density_gain_percent"])
+        self.assertEqual(3, examples[0]["yield_per_source"])
 
     def test_dismantling_ranks_by_saved_space(self):
         db = Database()

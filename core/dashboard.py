@@ -20,8 +20,15 @@ def best_storage_examples(db, reverse_index, limit=5):
     for finding in scan_all_materials(db, reverse_index)[:limit]:
         raw_density = finding["raw_density"]
         density = finding["density"]
+        candidate = next(
+            candidate
+            for candidate in reverse_index[finding["material"]]
+            if candidate["source"] == finding["best_source"]
+            and candidate["method"] == finding["method"]
+        )
         examples.append({
             **finding,
+            "yield_per_source": candidate["qty_per_source_unit"],
             "density_gain_percent": round((finding["gain"] - 1) * 100),
             "raw_cell_fills": [
                 min(raw_density, density - offset)
