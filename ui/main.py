@@ -772,7 +772,7 @@ def main(page: ft.Page):
         material = finding["material"]
         fills = " + ".join(str(fill) for fill in finding["raw_cell_fills"])
         return ft.Container(
-            width=HOME_CARD_WIDTH,
+            expand=True,
             padding=14,
             border_radius=14,
             bgcolor="#111622",
@@ -917,7 +917,8 @@ def main(page: ft.Page):
                 ft.Row(
                     [build_storage_finding_card(finding) for finding in storage_findings],
                     spacing=12,
-                    scroll=ft.ScrollMode.AUTO,
+                    intrinsic_height=True,
+                    vertical_alignment=ft.CrossAxisAlignment.STRETCH,
                 ),
                 ft.Text("Better dismantled", size=22, weight=ft.FontWeight.BOLD),
                 ft.Text(
