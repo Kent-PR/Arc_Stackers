@@ -85,6 +85,16 @@ class LocalizationTests(unittest.TestCase):
         # main adds one app shell, while this fake page keeps its control tree.
         page.add = lambda *items: controls.extend(items)
         with tempfile.TemporaryDirectory() as directory:
+            # A real finding exercises the card builder, which an empty
+            # dataset skips (including its text arguments and placeholders).
+            for item in [
+                {'id': 'wire', 'name': {'en': 'Wire'}, 'stackSize': 10},
+                {'id': 'radio', 'name': {'en': 'Radio'}, 'stackSize': 5,
+                 'recyclesInto': {'wire': 5}},
+            ]:
+                Path(directory, item['id'] + '.json').write_text(
+                    json.dumps(item), encoding='utf-8',
+                )
             with patch('ui.main.ensure_data', return_value=directory):
                 main(page)
         self.assertEqual('ARC Raiders Storage Optimizer', page.title)
