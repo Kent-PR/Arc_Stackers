@@ -52,7 +52,7 @@ PICKER_HIDDEN_TYPES = {
     "Topside Material",
     "Nature",
 }
-HOME_PREVIEW_SIZE = 80
+HOME_PREVIEW_SIZE = 128
 HOME_ITEM_COUNT = 6
 HOME_CARDS_PER_ROW = 3
 LANGUAGE_LABELS = {
@@ -769,7 +769,6 @@ def main(page: ft.Page):
     def build_storage_finding_card(finding):
         source = finding["best_source"]
         material = finding["material"]
-        fills = " + ".join(f"×{fill}" for fill in finding["raw_cell_fills"])
         return ft.Container(
             expand=True,
             padding=14,
@@ -801,7 +800,7 @@ def main(page: ft.Page):
                                 ],
                                 spacing=4,
                                 expand=True,
-                                alignment=ft.MainAxisAlignment.CENTER,
+                                alignment=ft.MainAxisAlignment.START,
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
@@ -816,13 +815,6 @@ def main(page: ft.Page):
                         f"+{finding['density_gain_percent']}% storage density",
                         color=ft.Colors.CYAN_300,
                         weight=ft.FontWeight.BOLD,
-                    ),
-                    ft.Text(
-                        f"1 full stack (×{finding['source_stack_size']} {item_name(source)}) "
-                        f"becomes {len(finding['raw_cell_fills'])} cells of "
-                        f"{item_name(material)} ({fills})",
-                        size=12,
-                        color=ft.Colors.GREY_400,
                     ),
                 ],
                 spacing=8,
