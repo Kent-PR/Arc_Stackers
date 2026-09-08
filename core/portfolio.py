@@ -8,11 +8,19 @@ from heapq import heappop, heappush
 from itertools import product
 from math import ceil
 
-from .representations import describe_rep, enumerate_representations
+from .representations import enumerate_representations
 
 
 MAX_STATES = 300_000
 MAX_REPRESENTATION_COMBINATIONS = 20_000
+
+
+class OptimizationError(ValueError):
+    """A stable error code; callers supply the user-facing translation."""
+
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
 
 
 class CalculationCancelled(Exception):
@@ -94,9 +102,8 @@ def _build_actions(db, requested, raw_data, should_cancel=None):
     return item_ids, demands, actions
 
 
-def _solve_material_portfolio(db, requested, raw_data, names, should_cancel=None):
+def _solve_material_portfolio(db, requested, raw_data, should_cancel=None):
     """Solve one already-expanded set of material requirements."""
-    names = names or {}
     item_ids, demands, actions = _build_actions(
         db, requested, raw_data, should_cancel=should_cancel
     )
@@ -183,9 +190,7 @@ def _solve_material_portfolio(db, requested, raw_data, names, should_cancel=None
                 previous[next_state] = (state, action_index)
                 heappush(queue, (*next_score, next_state))
                 if len(search_score) > MAX_STATES:
-                    raise ValueError(
-                        "The joint request is too large for the current exact optimizer."
-                    )
+                    raise OptimizationError("error.request_too_large")
 
     chosen = []
     state = best_state
@@ -223,7 +228,6 @@ def _solve_material_portfolio(db, requested, raw_data, names, should_cancel=None
                 useful[item_id] = amount
         allocations.append({
             "source": source,
-            "source_name": names.get(source, source),
             "method": action["method"],
             "quantity": action["quantity"],
             "outputs": useful,
@@ -263,7 +267,7 @@ def _solve_material_portfolio(db, requested, raw_data, names, should_cancel=None
 
 
 def compute_storage_portfolio(
-    db, requested, raw_data, names=None, on_progress=None, should_cancel=None
+    db, requested, raw_data, on_progress=None, should_cancel=None
 ):
     """Return the minimum-cell joint plan, including recipe alternatives.
 
@@ -274,7 +278,6 @@ def compute_storage_portfolio(
     requested = {item: int(qty) for item, qty in requested.items() if int(qty) > 0}
     if not requested:
         return None
-    names = names or {}
     root_items = tuple(requested)
     representation_options = []
     combination_count = 1
@@ -284,9 +287,7 @@ def compute_storage_portfolio(
         representation_options.append(reps)
         combination_count *= len(reps)
         if combination_count > MAX_REPRESENTATION_COMBINATIONS:
-            raise ValueError(
-                "There are too many combined crafting-tree variants for the current exact optimizer."
-            )
+            raise OptimizationError("error.too_many_variants")
 
     completed_variants = 0
     if on_progress:
@@ -303,7 +304,6 @@ def compute_storage_portfolio(
         for root_item, rep in zip(root_items, chosen_reps):
             multiplier = requested[root_item]
             recipe_choices[root_item] = {
-                "label": describe_rep(rep, names, lang="en"),
                 "terms": rep,
             }
             for term_key, quantity_per_root in rep.items():
@@ -320,11 +320,10 @@ def compute_storage_portfolio(
                     db,
                     requirements,
                     raw_data,
-                    names,
                     should_cancel=should_cancel,
                 )
-            except ValueError as error:
-                if "too large" not in str(error).lower():
+            except OptimizationError as error:
+                if error.code != "error.request_too_large":
                     raise
                 skipped_variants += 1
                 completed_variants += 1
@@ -350,8 +349,6 @@ def compute_storage_portfolio(
             on_progress(completed_variants, combination_count)
 
     if best_result is None:
-        raise ValueError(
-            "The joint request is too large for the current optimizer."
-        )
+        raise OptimizationError("error.request_too_large")
     best_result["skipped_variants"] = skipped_variants
     return best_result
