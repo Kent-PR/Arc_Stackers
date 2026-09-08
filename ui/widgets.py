@@ -80,6 +80,7 @@ def _build_item_surface(
     size,
     padding,
     font_size,
+    quantity=None,
 ):
     """Place the Figma rarity frame and item art over the game-dark surface."""
     controls = [
@@ -139,6 +140,23 @@ def _build_item_surface(
             ),
         )
     )
+    if quantity is not None:
+        controls.append(
+            ft.Container(
+                right=size * 12 / CELL_SIZE,
+                top=size * (
+                    1 - FOOTER_HEIGHT_RATIO - FOOTER_BOTTOM_MARGIN_RATIO
+                ),
+                height=footer_height,
+                alignment=ft.Alignment.CENTER_RIGHT,
+                content=ft.Text(
+                    f"×{quantity}",
+                    size=max(10, size * 14 / CELL_SIZE),
+                    weight=ft.FontWeight.BOLD,
+                    color=ft.Colors.WHITE,
+                ),
+            )
+        )
     return ft.Container(
         width=size,
         height=size,
@@ -283,7 +301,7 @@ def _cell_sort_key(occupant, fill, names, item_data, sort_mode="rarity"):
     return -RARITY_RANK.get(rarity, 0), *name_key
 
 
-def build_item_preview(item_id, names, item_data, size=52):
+def build_item_preview(item_id, names, item_data, size=52, quantity=None):
     """Build a rarity-backed preview that replaces its name with artwork."""
     data = item_data.get(item_id, {})
     rarity = str(data.get("rarity", "")).lower()
@@ -303,6 +321,7 @@ def build_item_preview(item_id, names, item_data, size=52):
         size=size,
         padding=padding,
         font_size=font_size,
+        quantity=quantity,
     )
 
 
@@ -542,7 +561,7 @@ def build_cell_grid(
                         height=CELL_SIZE * FOOTER_HEIGHT_RATIO,
                         alignment=ft.Alignment.CENTER_RIGHT,
                         content=ft.Text(
-                            str(fill),
+                            f"×{fill}",
                             size=14,
                             weight=ft.FontWeight.BOLD,
                             color=ft.Colors.WHITE,
