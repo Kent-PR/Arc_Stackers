@@ -68,6 +68,7 @@ def _picker_item_sort_key(item_id, names, raw_data):
 
 def main(page: ft.Page):
     page.title = "ARC Raiders Storage Optimizer"
+    page.window.maximized = True
     page.padding = 20
 
     # --- ensure item data is present (downloads on first run, checks for
