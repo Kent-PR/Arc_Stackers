@@ -822,8 +822,15 @@ def main(page: ft.Page):
                     ),
                     ft.Text(
                         t("home.density", percent=finding["density_gain_percent"]),
+                        t("home.density", percent=finding["density_gain_percent"]),
                         color=ft.Colors.CYAN_300,
                         weight=ft.FontWeight.BOLD,
+                    ),
+                    ft.Text(
+                        f"1 cell ({finding['density']} × {item_name(material)}) "
+                        f"instead of {len(finding['raw_cell_fills'])} ({fills})",
+                        size=12,
+                        color=ft.Colors.GREY_400,
                     ),
                 ],
                 spacing=8,
