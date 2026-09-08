@@ -15,6 +15,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.analysis import compute_storage
 from core.containers import build_reverse_index
+from core.dashboard import (
+    available_languages,
+    best_dismantling_examples,
+    best_storage_examples,
+)
 from core.fetch import ensure_data
 from core.loader import load_items
 from core.portfolio import CalculationCancelled, compute_storage_portfolio
@@ -47,6 +52,32 @@ PICKER_HIDDEN_TYPES = {
     "Key",
     "Topside Material",
     "Nature",
+}
+HOME_CARD_WIDTH = 248
+HOME_PREVIEW_SIZE = 96
+HOME_ITEM_COUNT = 5
+LANGUAGE_LABELS = {
+    "da": "Dansk",
+    "de": "Deutsch",
+    "en": "English",
+    "es": "Español",
+    "fr": "Français",
+    "he": "עברית",
+    "hr": "Hrvatski",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko-KR": "한국어",
+    "kr": "한국어 (kr)",
+    "no": "Norsk",
+    "pl": "Polski",
+    "pt": "Português",
+    "pt-BR": "Português (Brasil)",
+    "ru": "Русский",
+    "sr": "Srpski",
+    "tr": "Türkçe",
+    "uk": "Українська",
+    "zh-CN": "简体中文",
+    "zh-TW": "繁體中文",
 }
 
 
@@ -676,34 +707,236 @@ def main(page: ft.Page):
         ),
     )
 
-    page.add(
-        ft.Row(
+    calculator_body = ft.Row(
+        [
+            ft.Container(
+                content=ft.Column(
+                    [
+                        sort_button_with_hover,
+                        grid_column,
+                    ],
+                    spacing=8,
+                    expand=True,
+                ),
+                # Keep the scrollbar at the outer edge without using a
+                # clipping border on the hover-bearing container.
+                width=GRID_WIDTH + 19,
+            ),
+            ft.VerticalDivider(
+                width=1,
+                thickness=1,
+                color=ft.Colors.GREY_400,
+            ),
+            input_panel,
+        ],
+        expand=True,
+        spacing=0,
+        vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+    )
+
+    app_shell = ft.Container(expand=True)
+
+    def item_name(item_id):
+        return names.get(item_id, item_id)
+
+    def show_home(e=None):
+        app_shell.content = build_home_view()
+        page.update()
+
+    def show_storage_optimizer(e=None):
+        app_shell.content = ft.Column(
             [
+                ft.Row(
+                    [
+                        ft.IconButton(
+                            icon=ft.Icons.ARROW_BACK,
+                            tooltip="Back to home",
+                            on_click=show_home,
+                        ),
+                        ft.Text("Storage optimizer", size=20, weight=ft.FontWeight.BOLD),
+                    ],
+                    spacing=8,
+                ),
+                calculator_body,
+            ],
+            expand=True,
+            spacing=8,
+        )
+        page.update()
+
+    def show_craft_helper_notice(e=None):
+        page.show_dialog(ft.SnackBar(ft.Text("Craft helper is coming next.")))
+
+    def build_storage_finding_card(finding):
+        source = finding["best_source"]
+        material = finding["material"]
+        fills = " + ".join(str(fill) for fill in finding["raw_cell_fills"])
+        return ft.Container(
+            width=HOME_CARD_WIDTH,
+            padding=14,
+            border_radius=14,
+            bgcolor="#111622",
+            border=ft.Border.all(1, "#263247"),
+            content=ft.Column(
+                [
+                    ft.Row(
+                        [
+                            build_item_preview(source, names, raw_data, size=HOME_PREVIEW_SIZE),
+                            ft.Icon(ft.Icons.ARROW_FORWARD, color=ft.Colors.CYAN_300),
+                            build_item_preview(material, names, raw_data, size=HOME_PREVIEW_SIZE),
+                        ],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    ft.Text(
+                        f"Store {item_name(material)} as {item_name(source)}",
+                        weight=ft.FontWeight.BOLD,
+                        size=15,
+                    ),
+                    ft.Text(
+                        f"+{finding['density_gain_percent']}% storage density",
+                        color=ft.Colors.CYAN_300,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    ft.Text(
+                        f"1 cell ({finding['density']} × {item_name(material)}) "
+                        f"instead of {len(finding['raw_cell_fills'])} ({fills})",
+                        size=12,
+                        color=ft.Colors.GREY_400,
+                    ),
+                ],
+                spacing=8,
+            ),
+        )
+
+    def build_dismantling_card(example):
+        method_label = "Recycle" if example["method"] == "recyclesInto" else "Salvage"
+        output_label = ", ".join(
+            f"{quantity} × {item_name(material)}"
+            for material, quantity in example["yields"].items()
+        )
+        return ft.Container(
+            width=HOME_CARD_WIDTH,
+            padding=14,
+            border_radius=14,
+            bgcolor="#111622",
+            border=ft.Border.all(1, "#263247"),
+            content=ft.Column(
+                [
+                    build_item_preview(
+                        example["source"], names, raw_data, size=HOME_PREVIEW_SIZE
+                    ),
+                    ft.Text(item_name(example["source"]), weight=ft.FontWeight.BOLD, size=15),
+                    ft.Text(
+                        f"−{example['saved_percent']}% space in large batches",
+                        color=ft.Colors.GREEN_300,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    ft.Text(f"{method_label}: {output_label}", size=12, color=ft.Colors.GREY_400),
+                ],
+                spacing=8,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+        )
+
+    def build_home_view():
+        storage_findings = best_storage_examples(
+            db, reverse_index, limit=HOME_ITEM_COUNT
+        )
+        dismantling_findings = best_dismantling_examples(
+            db, raw_data, limit=HOME_ITEM_COUNT
+        )
+        language_dropdown = ft.Dropdown(
+            value="en",
+            width=190,
+            dense=True,
+            leading_icon=ft.Icons.LANGUAGE,
+            options=[
+                ft.DropdownOption(
+                    key=locale,
+                    text=LANGUAGE_LABELS.get(locale, locale),
+                )
+                for locale in available_languages(raw_data)
+            ],
+            tooltip="Language selection (coming soon)",
+        )
+        primary_button_style = ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=12),
+        )
+        return ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Text("ARC Stackers", size=26, weight=ft.FontWeight.BOLD),
+                        language_dropdown,
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
                 ft.Container(
                     content=ft.Column(
                         [
-                            sort_button_with_hover,
-                            grid_column,
+                            ft.Text(
+                                "Make every storage cell count",
+                                size=34,
+                                weight=ft.FontWeight.BOLD,
+                                text_align=ft.TextAlign.CENTER,
+                            ),
+                            ft.Text(
+                                "Find the most compact way to keep your items and materials.",
+                                color=ft.Colors.GREY_400,
+                                text_align=ft.TextAlign.CENTER,
+                            ),
+                            ft.Button(
+                                content="Storage optimizer",
+                                icon=ft.Icons.INVENTORY_2,
+                                width=320,
+                                height=54,
+                                style=primary_button_style,
+                                on_click=show_storage_optimizer,
+                            ),
+                            ft.OutlinedButton(
+                                content="Craft helper",
+                                icon=ft.Icons.HANDYMAN,
+                                width=320,
+                                height=50,
+                                style=primary_button_style,
+                                on_click=show_craft_helper_notice,
+                            ),
                         ],
-                        spacing=8,
-                        expand=True,
+                        spacing=12,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
-                    # Keep the scrollbar at the outer edge without using a
-                    # clipping border on the hover-bearing container.
-                    width=GRID_WIDTH + 19,
+                    alignment=ft.Alignment.CENTER,
+                    padding=ft.Padding.symmetric(vertical=20),
                 ),
-                ft.VerticalDivider(
-                    width=1,
-                    thickness=1,
+                ft.Text("Best compact storage", size=22, weight=ft.FontWeight.BOLD),
+                ft.Text(
+                    "Keep the source item and recycle or salvage it when you need the material.",
                     color=ft.Colors.GREY_400,
                 ),
-                input_panel,
+                ft.Row(
+                    [build_storage_finding_card(finding) for finding in storage_findings],
+                    spacing=12,
+                    scroll=ft.ScrollMode.AUTO,
+                ),
+                ft.Text("Better dismantled", size=22, weight=ft.FontWeight.BOLD),
+                ft.Text(
+                    "These items take less space as their recycled materials when stacks fill up.",
+                    color=ft.Colors.GREY_400,
+                ),
+                ft.Row(
+                    [build_dismantling_card(example) for example in dismantling_findings],
+                    spacing=12,
+                    scroll=ft.ScrollMode.AUTO,
+                ),
             ],
+            spacing=12,
+            scroll=ft.ScrollMode.AUTO,
             expand=True,
-            spacing=0,
-            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
-    )
+
+    app_shell.content = build_home_view()
+    page.add(app_shell)
 
 
 if __name__ == "__main__":
