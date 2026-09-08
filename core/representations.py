@@ -173,18 +173,3 @@ def cell_groups(db, rep, n, reverse_index=None, owned_quantities=None):
         })
 
     return groups
-
-
-def describe_rep(rep, names=None, lang="ru"):
-    """Human-readable label for a representation, e.g.
-    'Electrical Components + Sensors (as Broken Handheld Radio)'."""
-    names = names or {}
-    parts = []
-    for key in rep:
-        if key[0] == "raw":
-            parts.append(names.get(key[1], key[1]))
-        else:
-            _, item_id, source, method = key
-            joiner = "as" if lang == "en" else "как"
-            parts.append(f"{names.get(item_id, item_id)} ({joiner} {names.get(source, source)})")
-    return " + ".join(sorted(parts))

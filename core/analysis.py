@@ -1,14 +1,14 @@
 """High-level, UI-facing calculations built on top of representations.py.
 Every function here returns plain data (dicts/lists) - no printing.
 """
-from .representations import cell_groups, cost, describe_rep, enumerate_representations, fully_expanded_raw
+from .representations import cell_groups, cost, enumerate_representations, fully_expanded_raw
 
 
-def compute_storage(db, item, n, reverse_index=None, names=None, lang="ru",
+def compute_storage(db, item, n, reverse_index=None,
                      owned_quantities=None):
     """Everything the Storage Calculator screen needs for one item/quantity:
     the best representation, and every alternative ranked worse-to-better,
-    each with its cell cost, a human-readable label, and a cell-by-cell
+    each with its cell cost, structured terms, and a cell-by-cell
     breakdown (for the grid visual) attached only to the best one."""
     reps = enumerate_representations(db, item, reverse_index=reverse_index)
     if not reps:
@@ -21,7 +21,7 @@ def compute_storage(db, item, n, reverse_index=None, names=None, lang="ru",
     scored.sort(key=lambda pair: pair[0])
 
     ranked = [
-        {"cost": c, "label": describe_rep(rep, names, lang), "terms": rep}
+        {"cost": c, "terms": rep}
         for c, rep in scored
     ]
     ranked[0]["groups"] = cell_groups(
@@ -36,7 +36,7 @@ def compute_storage(db, item, n, reverse_index=None, names=None, lang="ru",
     }
 
 
-def compute_crafting_naive_vs_optimal(db, item, n, reverse_index=None, names=None, lang="ru",
+def compute_crafting_naive_vs_optimal(db, item, n, reverse_index=None,
                                        expandable_nodes=None, allowed_container_sources=None,
                                        owned_quantities=None):
     """For the Crafting Calculator screen: variant 1 is the deterministic
@@ -62,6 +62,6 @@ def compute_crafting_naive_vs_optimal(db, item, n, reverse_index=None, names=Non
     return {
         "item": item,
         "n": n,
-        "naive": {"cost": naive_cost, "label": describe_rep(naive_terms, names, lang)},
-        "optimal": {"cost": best_cost, "label": describe_rep(best_rep, names, lang)},
+        "naive": {"cost": naive_cost, "terms": naive_terms},
+        "optimal": {"cost": best_cost, "terms": best_rep},
     }

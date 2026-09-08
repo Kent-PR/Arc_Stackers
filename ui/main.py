@@ -4,6 +4,7 @@ once this skeleton is confirmed working end-to-end.
 """
 import asyncio
 import os
+import logging
 import queue
 import random
 import sys
@@ -13,15 +14,15 @@ import flet as ft
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from ui.i18n import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, Translator, describe_rep
 from core.analysis import compute_storage
 from core.containers import build_reverse_index
 from core.dashboard import (
-    available_languages,
     best_storage_examples,
 )
 from core.fetch import ensure_data
 from core.loader import load_items
-from core.portfolio import CalculationCancelled, compute_storage_portfolio
+from core.portfolio import CalculationCancelled, OptimizationError, compute_storage_portfolio
 from ui.widgets import (
     CELL_SIZE,
     GRID_WIDTH,
@@ -97,14 +98,19 @@ def _picker_item_sort_key(item_id, names, raw_data):
 
 
 def main(page: ft.Page):
-    page.title = "ARC Raiders Storage Optimizer"
+    language = os.environ.get("ARC_STACKERS_LANGUAGE", DEFAULT_LANGUAGE)
+    if language not in SUPPORTED_LANGUAGES:
+        language = DEFAULT_LANGUAGE
+    translator = Translator(language)
+    t = translator.t
+    page.title = t("app.title")
     page.window.maximized = True
     page.padding = 20
 
     # --- ensure item data is present (downloads on first run, checks for
     #     updates afterwards; see core/fetch.py) then load it ---
     items_dir = ensure_data(on_status=lambda m: print(m))  # TODO: route to a loading screen
-    db, names, raw_data = load_items(items_dir, lang="en")
+    db, names, raw_data = load_items(items_dir, lang=language)
     reverse_index = build_reverse_index(db, raw_data)
 
     storage_items = {}
@@ -114,19 +120,19 @@ def main(page: ft.Page):
     last_grid_groups = {"value": None}
 
     add_button = ft.Button(
-        content="Add item",
+        content=t("storage.add"),
         width=CELL_SIZE,
     )
-    calculate_button = ft.Button(content="Calculate storage", disabled=True)
+    calculate_button = ft.Button(content=t("storage.calculate"), disabled=True)
     grid_column = ft.Column(
-        [ft.Text("Select an item and calculate to display its storage grid.", italic=True)],
+        [ft.Text(t("storage.empty"), italic=True)],
         spacing=8,
         scroll=ft.ScrollMode.ALWAYS,
         expand=True,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
     )
     sort_button = ft.OutlinedButton(
-        content="Sort: Rarity",
+        content=t("storage.sort.rarity"),
         width=GRID_WIDTH,
         height=SORT_BUTTON_HEIGHT,
         disabled=True,
@@ -154,7 +160,7 @@ def main(page: ft.Page):
         content=ft.Column(
             [
                 ft.Icon(ft.Icons.ADD, size=30, color=ft.Colors.GREY_400),
-                ft.Text("Choose item", color=ft.Colors.GREY_400),
+                ft.Text(t("storage.choose"), color=ft.Colors.GREY_400),
             ],
             spacing=4,
             alignment=ft.MainAxisAlignment.CENTER,
@@ -162,7 +168,7 @@ def main(page: ft.Page):
         ),
     )
     picker_search = ft.TextField(
-        label="Search items",
+        label=t("storage.search"),
         prefix_icon=ft.Icons.SEARCH,
         dense=True,
     )
@@ -235,7 +241,7 @@ def main(page: ft.Page):
                 if quantity <= 0:
                     raise ValueError
             except (TypeError, ValueError):
-                committed_quantity.error_text = "Positive integer"
+                committed_quantity.error_text = t("validation.positive_integer")
             else:
                 committed_quantity.error_text = None
                 storage_items[item_id] = quantity
@@ -278,7 +284,7 @@ def main(page: ft.Page):
             spacing=0,
         )
         remove_button = ft.OutlinedButton(
-            content="Remove",
+            content=t("storage.remove"),
             width=CELL_SIZE,
             style=ft.ButtonStyle(
                 bgcolor="#4A1118",
@@ -380,7 +386,7 @@ def main(page: ft.Page):
             "value" if grid_sort_mode["value"] == "rarity" else "rarity"
         )
         sort_button.content = (
-            "Sort: Value" if grid_sort_mode["value"] == "value" else "Sort: Rarity"
+            t("storage.sort.value") if grid_sort_mode["value"] == "value" else t("storage.sort.rarity")
         )
         groups = last_grid_groups["value"]
         # Rebuilding destroys the controls currently used by the reveal
@@ -427,15 +433,15 @@ def main(page: ft.Page):
         is_portfolio = len(storage_items) > 1
         if is_portfolio:
             progress_bar = ft.ProgressBar(value=0, width=360)
-            progress_text = ft.Text("Preparing storage variants…", size=16)
+            progress_text = ft.Text(t("calculation.preparing"), size=16)
             progress_detail = ft.Text("0%", size=28, weight=ft.FontWeight.BOLD)
             cancel_event = threading.Event()
-            cancel_button = ft.OutlinedButton(content="Cancel calculation")
+            cancel_button = ft.OutlinedButton(content=t("calculation.cancel"))
 
             def cancel_calculation(e):
                 cancel_event.set()
                 cancel_button.disabled = True
-                progress_text.value = "Cancelling…"
+                progress_text.value = t("calculation.cancelling")
                 page.update()
 
             cancel_button.on_click = cancel_calculation
@@ -463,7 +469,6 @@ def main(page: ft.Page):
                     db,
                     dict(storage_items),
                     raw_data,
-                    names,
                     report_progress,
                     cancel_event.is_set,
                 )
@@ -478,7 +483,7 @@ def main(page: ft.Page):
                         fraction = completed / total if total else 0
                         progress_bar.value = fraction
                         progress_detail.value = f"{fraction:.0%}"
-                        progress_text.value = f"Checked {completed} of {total} storage variants"
+                        progress_text.value = t("calculation.progress", completed=completed, total=total)
                         page.update()
                     await asyncio.sleep(0.05)
                 result = await calculation
@@ -489,13 +494,15 @@ def main(page: ft.Page):
                 sort_button.disabled = True
                 grid_column.controls.clear()
                 grid_column.controls.append(
-                    ft.Text("Calculation cancelled.", italic=True)
+                    ft.Text(t("calculation.cancelled"), italic=True)
                 )
                 page.update()
                 return
             except ValueError as error:
                 calculate_button.disabled = False
-                results_column.controls.append(ft.Text(str(error), color=ft.Colors.RED_400))
+                logging.getLogger(__name__).exception("Storage calculation failed")
+                message = t(error.code) if isinstance(error, OptimizationError) else t("calculation.failed")
+                results_column.controls.append(ft.Text(message, color=ft.Colors.RED_400))
                 page.update()
                 return
             calculate_button.disabled = False
@@ -503,10 +510,10 @@ def main(page: ft.Page):
         else:
             item_id, n = next(iter(storage_items.items()))
             result = compute_storage(
-                db, item_id, n, reverse_index=reverse_index, names=names, lang="en"
+                db, item_id, n, reverse_index=reverse_index
             )
         if result is None:
-            results_column.controls.append(ft.Text("This item cannot be stored (no stack size known)."))
+            results_column.controls.append(ft.Text(t("storage.unstorable")))
             page.update()
             return
 
@@ -517,11 +524,11 @@ def main(page: ft.Page):
             ft.Container(
                 content=ft.Column([
                     ft.Text(
-                        "Best combined storage plan" if is_portfolio else "Best storage method",
+                        t("storage.best_combined") if is_portfolio else t("storage.best"),
                         weight=ft.FontWeight.BOLD,
                     ),
-                    *([] if is_portfolio else [ft.Text(f"{best['label']}")]),
-                    ft.Text(f"{best['cost']} cell(s)", size=20, weight=ft.FontWeight.BOLD),
+                    *([] if is_portfolio else [ft.Text(describe_rep(best["terms"], names, translator))]),
+                    ft.Text(t("storage.cells", count=best["cost"]), size=20, weight=ft.FontWeight.BOLD),
                 ]),
                 bgcolor=ft.Colors.BLACK_45,
                 border_radius=8,
@@ -539,37 +546,39 @@ def main(page: ft.Page):
         active_reveal_generation["value"] = current_generation
         grid_column.controls.append(grid)
         if is_portfolio:
-            results_column.controls.append(ft.Text("Storage form", weight=ft.FontWeight.BOLD))
+            results_column.controls.append(ft.Text(t("storage.form"), weight=ft.FontWeight.BOLD))
             for root_item, choice in best["recipe_choices"].items():
                 results_column.controls.append(
                     ft.Text(
-                        f"{names.get(root_item, root_item)} → {choice['label']}"
+                        t("storage.choice", item=item_name(root_item),
+                          description=describe_rep(choice["terms"], names, translator))
                     )
                 )
             results_column.controls.append(
-                ft.Text("Material requirements", weight=ft.FontWeight.BOLD)
+                ft.Text(t("storage.requirements"), weight=ft.FontWeight.BOLD)
             )
             for covered_item, coverage in best["coverage"].items():
                 excess = coverage["excess"]
-                suffix = f" (+{excess} excess)" if excess else ""
+                suffix = t("storage.excess", count=excess) if excess else ""
                 results_column.controls.append(
                     ft.Text(
-                        f"{names.get(covered_item, covered_item)}: "
-                        f"{coverage['produced']} / {coverage['requested']}{suffix}"
+                        t("storage.coverage", item=item_name(covered_item),
+                          produced=coverage["produced"], requested=coverage["requested"],
+                          excess=suffix)
                     )
                 )
-            results_column.controls.append(ft.Text("Stored physically", weight=ft.FontWeight.BOLD))
+            results_column.controls.append(ft.Text(t("storage.physical"), weight=ft.FontWeight.BOLD))
             for source, quantity in best["stored"].items():
                 results_column.controls.append(
-                    ft.Text(f"{quantity} × {names.get(source, source)}")
+                    ft.Text(t("storage.quantity", quantity=quantity, item=item_name(source)))
                 )
         else:
-            results_column.controls.append(ft.Text("Other options:", weight=ft.FontWeight.BOLD))
+            results_column.controls.append(ft.Text(t("storage.alternatives"), weight=ft.FontWeight.BOLD))
             for alt in result["alternatives"][:4]:
                 results_column.controls.append(
                     ft.Row([
-                        ft.Text(f"{alt['cost']} cell(s)", width=90),
-                        ft.Text(alt["label"]),
+                        ft.Text(t("storage.cells", count=alt["cost"]), width=90),
+                        ft.Text(describe_rep(alt["terms"], names, translator)),
                     ])
                 )
         page.update()
@@ -679,7 +688,7 @@ def main(page: ft.Page):
         padding=ft.Padding.only(left=20),
         content=ft.Column(
             [
-                ft.Text("Storage Calculator", size=24, weight=ft.FontWeight.BOLD),
+                ft.Text(t("storage.title"), size=24, weight=ft.FontWeight.BOLD),
                 ft.Row(
                     [
                         ft.Column(
@@ -749,10 +758,10 @@ def main(page: ft.Page):
                     [
                         ft.IconButton(
                             icon=ft.Icons.ARROW_BACK,
-                            tooltip="Back to home",
+                            tooltip=t("navigation.home"),
                             on_click=show_home,
                         ),
-                        ft.Text("Storage optimizer", size=20, weight=ft.FontWeight.BOLD),
+                        ft.Text(t("navigation.storage"), size=20, weight=ft.FontWeight.BOLD),
                     ],
                     spacing=8,
                 ),
@@ -764,7 +773,7 @@ def main(page: ft.Page):
         page.update()
 
     def show_craft_helper_notice(e=None):
-        page.show_dialog(ft.SnackBar(ft.Text("Craft helper is coming next.")))
+        page.show_dialog(ft.SnackBar(ft.Text(t("crafting.coming_soon"))))
 
     def build_storage_finding_card(finding):
         source = finding["best_source"]
@@ -807,12 +816,12 @@ def main(page: ft.Page):
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                     ft.Text(
-                        f"Store {item_name(material)} as {item_name(source)}",
+                        t("home.recommendation", material=item_name(material), source=item_name(source)),
                         weight=ft.FontWeight.BOLD,
                         size=15,
                     ),
                     ft.Text(
-                        f"+{finding['density_gain_percent']}% storage density",
+                        t("home.density", percent=finding["density_gain_percent"]),
                         color=ft.Colors.CYAN_300,
                         weight=ft.FontWeight.BOLD,
                     ),
@@ -826,18 +835,19 @@ def main(page: ft.Page):
             db, reverse_index, limit=HOME_ITEM_COUNT
         )
         language_dropdown = ft.Dropdown(
-            value="en",
+            value=language,
+            disabled=True,
             width=190,
             dense=True,
             leading_icon=ft.Icons.LANGUAGE,
             options=[
                 ft.DropdownOption(
                     key=locale,
-                    text=LANGUAGE_LABELS.get(locale, locale),
+                    text=label,
                 )
-                for locale in available_languages(raw_data)
+                for locale, label in SUPPORTED_LANGUAGES.items()
             ],
-            tooltip="Language selection (coming soon)",
+            tooltip=t("language.label"),
         )
         primary_button_style = ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
@@ -867,18 +877,18 @@ def main(page: ft.Page):
                     content=ft.Column(
                         [
                             ft.Text(
-                                "Make every storage cell count",
+                                t("home.headline"),
                                 size=34,
                                 weight=ft.FontWeight.BOLD,
                                 text_align=ft.TextAlign.CENTER,
                             ),
                             ft.Text(
-                                "Find the most compact way to keep your items and materials.",
+                                t("home.description"),
                                 color=ft.Colors.GREY_400,
                                 text_align=ft.TextAlign.CENTER,
                             ),
                             ft.Button(
-                                content="Storage optimizer",
+                                content=t("navigation.storage"),
                                 icon=ft.Icons.INVENTORY_2,
                                 width=320,
                                 height=54,
@@ -886,7 +896,7 @@ def main(page: ft.Page):
                                 on_click=show_storage_optimizer,
                             ),
                             ft.OutlinedButton(
-                                content="Craft helper",
+                                content=t("navigation.crafting"),
                                 icon=ft.Icons.HANDYMAN,
                                 width=320,
                                 height=50,
@@ -900,9 +910,9 @@ def main(page: ft.Page):
                     alignment=ft.Alignment.CENTER,
                     padding=ft.Padding.symmetric(vertical=20),
                 ),
-                ft.Text("Best compact storage", size=22, weight=ft.FontWeight.BOLD),
+                ft.Text(t("home.best"), size=22, weight=ft.FontWeight.BOLD),
                 ft.Text(
-                    "Keep the source item and recycle or salvage it when you need the material.",
+                    t("home.hint"),
                     color=ft.Colors.GREY_400,
                 ),
                 ft.Column(

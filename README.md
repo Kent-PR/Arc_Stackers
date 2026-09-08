@@ -13,7 +13,7 @@ core/               # pure logic, zero printing, zero UI - shared by everything
                        RaidTheory/arcraiders-data into an OS cache dir
                        (never committed to this repo, see below)
   representations.py enumerate_representations(), cost(), cell_groups(),
-                      describe_rep(), fully_expanded_raw()  (the search engine)
+                      fully_expanded_raw()  (the search engine)
   containers.py       build_reverse_index(), best_containers_for(),
                        scan_all_materials()  (recycle/salvage lookups)
   portfolio.py        compute_storage_portfolio() - joint multi-item storage
@@ -33,6 +33,31 @@ ui/
 pip install -r requirements.txt
 python3 ui/main.py
 ```
+
+## Localization
+
+The UI currently ships in English. App messages live in `locales/en.json`;
+use `t("message.key", count=count)` in the UI for new text. Translate whole
+sentences with named placeholders, rather than joining translated words.
+For counts, prefer neutral labels such as `Cells: {count}` until plural rules
+are implemented. Keep all placeholders when translating a message.
+
+`ui/i18n.py` handles selected-language -> English -> key fallback and logs
+missing translations once per key. Item names independently use the game's
+JSON translations with English and item ID fallbacks through `load_items()`.
+Game-data languages are not the list of supported UI languages.
+
+To add a UI language, create `locales/<locale>.json` and register its code and
+native name in `SUPPORTED_LANGUAGES` in `ui/i18n.py`. Partial catalogs work.
+Set `ARC_STACKERS_LANGUAGE` to that code before starting the app; restart to
+apply changes. Unsupported codes use English. The home language indicator
+is currently disabled; live switching and persistent UI settings are deferred.
+
+Calculations return IDs, numbers, operation codes and representation `terms`.
+Format those terms with `ui.i18n.describe_rep()` when displaying results.
+Calculation APIs no longer accept `names`/`lang` or return `label`/`source_name`;
+callers should resolve names in the presentation layer. Optimizer limit errors
+expose a stable `OptimizationError.code`, which the UI translates.
 
 On first run this downloads the item data (~3.5 MB of JSON) from
 RaidTheory/arcraiders-data into your OS cache directory - NOT into this

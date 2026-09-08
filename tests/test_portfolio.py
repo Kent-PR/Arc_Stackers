@@ -87,15 +87,14 @@ class PortfolioTests(unittest.TestCase):
 
         result = compute_storage_portfolio(
             db, {"bandage": 100}, {},
-            names={"bandage": "Bandage", "cloth": "Cloth", "plant": "Plant"},
             on_progress=lambda completed, total: progress.append((completed, total)),
         )
 
         self.assertEqual(17, result["best"]["cost"])
         self.assertEqual({"cloth": 100, "plant": 100}, result["requirements"])
         self.assertEqual(
-            "Cloth + Plant",
-            result["best"]["recipe_choices"]["bandage"]["label"],
+            {("raw", "cloth"): 1, ("raw", "plant"): 1},
+            result["best"]["recipe_choices"]["bandage"]["terms"],
         )
         self.assertEqual((0, 2), progress[0])
         self.assertEqual((2, 2), progress[-1])
