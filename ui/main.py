@@ -52,8 +52,9 @@ PICKER_HIDDEN_TYPES = {
     "Topside Material",
     "Nature",
 }
-HOME_PREVIEW_SIZE = 96
-HOME_ITEM_COUNT = 5
+HOME_PREVIEW_SIZE = 80
+HOME_ITEM_COUNT = 6
+HOME_CARDS_PER_ROW = 3
 LANGUAGE_LABELS = {
     "en": "English",
     "ru": "Русский",
@@ -768,7 +769,7 @@ def main(page: ft.Page):
     def build_storage_finding_card(finding):
         source = finding["best_source"]
         material = finding["material"]
-        fills = " + ".join(str(fill) for fill in finding["raw_cell_fills"])
+        fills = " + ".join(f"×{fill}" for fill in finding["raw_cell_fills"])
         return ft.Container(
             expand=True,
             padding=14,
@@ -784,15 +785,23 @@ def main(page: ft.Page):
                                 names,
                                 raw_data,
                                 size=HOME_PREVIEW_SIZE,
-                                quantity=1,
+                                quantity=finding["source_stack_size"],
                             ),
                             ft.Icon(ft.Icons.ARROW_FORWARD, color=ft.Colors.CYAN_300),
-                            build_item_preview(
-                                material,
-                                names,
-                                raw_data,
-                                size=HOME_PREVIEW_SIZE,
-                                quantity=finding["yield_per_source"],
+                            ft.Row(
+                                [
+                                    build_item_preview(
+                                        material,
+                                        names,
+                                        raw_data,
+                                        size=HOME_PREVIEW_SIZE,
+                                        quantity=fill,
+                                    )
+                                    for fill in finding["raw_cell_fills"]
+                                ],
+                                spacing=4,
+                                expand=True,
+                                alignment=ft.MainAxisAlignment.CENTER,
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
@@ -809,8 +818,9 @@ def main(page: ft.Page):
                         weight=ft.FontWeight.BOLD,
                     ),
                     ft.Text(
-                        f"1 cell ({finding['density']} × {item_name(material)}) "
-                        f"instead of {len(finding['raw_cell_fills'])} ({fills})",
+                        f"1 full stack (×{finding['source_stack_size']} {item_name(source)}) "
+                        f"becomes {len(finding['raw_cell_fills'])} cells of "
+                        f"{item_name(material)} ({fills})",
                         size=12,
                         color=ft.Colors.GREY_400,
                     ),
@@ -840,6 +850,18 @@ def main(page: ft.Page):
         primary_button_style = ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
         )
+        storage_rows = [
+            ft.Row(
+                [build_storage_finding_card(finding) for finding in row_findings],
+                spacing=12,
+                intrinsic_height=True,
+                vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+            )
+            for row_start in range(0, len(storage_findings), HOME_CARDS_PER_ROW)
+            for row_findings in [
+                storage_findings[row_start:row_start + HOME_CARDS_PER_ROW]
+            ]
+        ]
         return ft.Column(
             [
                 ft.Row(
@@ -891,11 +913,9 @@ def main(page: ft.Page):
                     "Keep the source item and recycle or salvage it when you need the material.",
                     color=ft.Colors.GREY_400,
                 ),
-                ft.Row(
-                    [build_storage_finding_card(finding) for finding in storage_findings],
+                ft.Column(
+                    storage_rows,
                     spacing=12,
-                    intrinsic_height=True,
-                    vertical_alignment=ft.CrossAxisAlignment.STRETCH,
                 ),
             ],
             spacing=12,

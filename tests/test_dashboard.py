@@ -29,6 +29,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual([5, 4], examples[0]["raw_cell_fills"])
         self.assertEqual(80, examples[0]["density_gain_percent"])
         self.assertEqual(3, examples[0]["yield_per_source"])
+        self.assertEqual(3, examples[0]["source_stack_size"])
 
     def test_dismantling_ranks_by_saved_space(self):
         db = Database()

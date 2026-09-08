@@ -29,6 +29,7 @@ def best_storage_examples(db, reverse_index, limit=5):
         examples.append({
             **finding,
             "yield_per_source": candidate["qty_per_source_unit"],
+            "source_stack_size": candidate["source_stack_size"],
             "density_gain_percent": round((finding["gain"] - 1) * 100),
             "raw_cell_fills": [
                 min(raw_density, density - offset)
