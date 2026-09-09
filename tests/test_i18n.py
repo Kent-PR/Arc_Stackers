@@ -14,6 +14,58 @@ from ui.i18n import Translator, describe_rep
 
 
 class LocalizationTests(unittest.TestCase):
+    def test_live_switch_preserves_result_and_items_without_recalculation(self):
+        import flet as ft
+        from ui.main import build_app
+
+        def walk(control):
+            yield control
+            content = getattr(control, 'content', None)
+            if isinstance(content, ft.Control):
+                yield from walk(content)
+            for child in getattr(control, 'controls', []):
+                yield from walk(child)
+
+        db = Database()
+        db.add_raw('wire', 10)
+        raw = {'wire': {'name': {'en': 'Wire', 'ru': 'Провод'}, 'stackSize': 10}}
+        result = compute_storage(db, 'wire', 12)
+        state = {'language': 'en', 'items': {'wire': 12}, 'sort': 'value',
+                 'result': (result, False)}
+        page = SimpleNamespace(update=lambda: None)
+        shell = ft.Container()
+        with patch('ui.main.compute_storage', side_effect=AssertionError('Recalculation')):
+            build_app(page, shell, (db, raw, {}), state)
+            for language, title, button_label in [
+                ('ru', 'Оптимизатор хранилища ARC Raiders', 'Оптимизатор хранения'),
+                ('en', 'ARC Raiders Storage Optimizer', 'Storage optimizer'),
+            ]:
+                dropdown = next(c for c in walk(shell) if isinstance(c, ft.Dropdown))
+                dropdown.value = language
+                dropdown.on_select(SimpleNamespace(control=dropdown))
+                self.assertEqual(title, page.title)
+                self.assertEqual({'wire': 12}, state['items'])
+                self.assertIs(result, state['result'][0])
+                self.assertEqual('value', state['sort'])
+                button = next(c for c in walk(shell) if isinstance(c, ft.Button)
+                              and c.content == button_label)
+                button.on_click(None)
+                texts = [c.value for c in walk(shell) if isinstance(c, ft.Text)]
+                self.assertIn('Ячеек: 2' if language == 'ru' else 'Cells: 2', texts)
+                self.assertIn('Провод' if language == 'ru' else 'Wire', texts)
+                back = next(c for c in walk(shell) if isinstance(c, ft.IconButton)
+                            and c.icon == ft.Icons.ARROW_BACK)
+                back.on_click(None)
+
+    def test_russian_catalog_has_matching_keys_and_placeholders(self):
+        from string import Formatter
+        translator = Translator('ru')
+        self.assertEqual(translator.fallback.keys(), translator.messages.keys())
+        for key, english in translator.fallback.items():
+            fields = lambda text: {name for _, name, _, _ in Formatter().parse(text)
+                                   if name is not None}
+            self.assertEqual(fields(english), fields(translator.messages[key]), key)
+
     def test_partial_translation_falls_back_and_formats_named_parameters(self):
         with tempfile.TemporaryDirectory() as directory:
             Path(directory, 'en.json').write_text(json.dumps({

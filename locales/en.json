@@ -30,6 +30,7 @@
   "home.best": "Best compact storage",
   "home.hint": "Keep the source item and recycle or salvage it when you need the material.",
   "language.label": "Language",
+  "language.busy": "Wait for the calculation to finish or cancel it before changing language.",
   "calculation.progress": "Checked {completed} of {total} storage variants",
   "calculation.failed": "Could not calculate storage.",
   "storage.cells": "Cells: {count}",
