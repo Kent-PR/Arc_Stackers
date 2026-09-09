@@ -1,10 +1,10 @@
-"""Presentation-only translations. Set ARC_STACKERS_LANGUAGE before startup."""
+"""Presentation translations; ARC_STACKERS_LANGUAGE selects the startup locale."""
 import json
 import logging
 from pathlib import Path
 
 LOCALES_DIR = Path(__file__).resolve().parents[1] / "locales"
-SUPPORTED_LANGUAGES = {"en": "English"}
+SUPPORTED_LANGUAGES = {"en": "English", "ru": "Русский"}
 DEFAULT_LANGUAGE = "en"
 logger = logging.getLogger(__name__)
 

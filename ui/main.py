@@ -101,22 +101,33 @@ def main(page: ft.Page):
     language = os.environ.get("ARC_STACKERS_LANGUAGE", DEFAULT_LANGUAGE)
     if language not in SUPPORTED_LANGUAGES:
         language = DEFAULT_LANGUAGE
+    page.window.maximized = True
+    page.padding = 20
+    items_dir = ensure_data(on_status=lambda m: print(m))
+    db, _, raw_data = load_items(items_dir, lang=language)
+    data = (db, raw_data, build_reverse_index(db, raw_data))
+    state = {"language": language, "items": {}, "sort": "rarity", "result": None}
+    app_shell = ft.Container(expand=True)
+    build_app(page, app_shell, data, state)
+    page.add(app_shell)
+
+
+def build_app(page, app_shell, data, state):
+    """Rebuild controls from session state without reloading or recalculating."""
+    language = state["language"]
     translator = Translator(language)
     t = translator.t
     page.title = t("app.title")
-    page.window.maximized = True
-    page.padding = 20
-
-    # --- ensure item data is present (downloads on first run, checks for
-    #     updates afterwards; see core/fetch.py) then load it ---
-    items_dir = ensure_data(on_status=lambda m: print(m))  # TODO: route to a loading screen
-    db, names, raw_data = load_items(items_dir, lang=language)
-    reverse_index = build_reverse_index(db, raw_data)
-
-    storage_items = {}
+    db, raw_data, reverse_index = data
+    names = {
+        iid: (item.get("name") or {}).get(language)
+        or (item.get("name") or {}).get("en") or iid
+        for iid, item in raw_data.items()
+    }
+    storage_items = state["items"]
     animation_generation = {"value": 0}
     active_reveal_generation = {"value": None}
-    grid_sort_mode = {"value": "rarity"}
+    grid_sort_mode = {"value": state["sort"]}
     last_grid_groups = {"value": None}
 
     add_button = ft.Button(
@@ -132,7 +143,7 @@ def main(page: ft.Page):
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
     )
     sort_button = ft.OutlinedButton(
-        content=t("storage.sort.rarity"),
+        content=t("storage.sort." + grid_sort_mode["value"]),
         width=GRID_WIDTH,
         height=SORT_BUTTON_HEIGHT,
         disabled=True,
@@ -419,8 +430,76 @@ def main(page: ft.Page):
         refresh_storage_state()
         page.update()
 
+    def render_result(result, is_portfolio, animate=False):
+        grid_column.controls.clear()
+        results_column.controls.clear()
+        best = result["best"]
+        last_grid_groups["value"] = best["groups"]
+        sort_button.disabled = False
+        results_column.controls.append(
+            ft.Container(
+                content=ft.Column([
+                    ft.Text(
+                        t("storage.best_combined") if is_portfolio else t("storage.best"),
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    *([] if is_portfolio else [ft.Text(describe_rep(best["terms"], names, translator))]),
+                    ft.Text(t("storage.cells", count=best["cost"]), size=20, weight=ft.FontWeight.BOLD),
+                ]),
+                bgcolor=ft.Colors.BLACK_45,
+                border_radius=8,
+                padding=12,
+            )
+        )
+        grid, animated_cells = build_cell_grid(
+            best["groups"],
+            names,
+            raw_data,
+            animate_colors=animate,
+            sort_mode=grid_sort_mode["value"],
+        )
+        grid_column.controls.append(grid)
+        if is_portfolio:
+            results_column.controls.append(ft.Text(t("storage.form"), weight=ft.FontWeight.BOLD))
+            for root_item, choice in best["recipe_choices"].items():
+                results_column.controls.append(
+                    ft.Text(
+                        t("storage.choice", item=item_name(root_item),
+                          description=describe_rep(choice["terms"], names, translator))
+                    )
+                )
+            results_column.controls.append(
+                ft.Text(t("storage.requirements"), weight=ft.FontWeight.BOLD)
+            )
+            for covered_item, coverage in best["coverage"].items():
+                excess = coverage["excess"]
+                suffix = t("storage.excess", count=excess) if excess else ""
+                results_column.controls.append(
+                    ft.Text(
+                        t("storage.coverage", item=item_name(covered_item),
+                          produced=coverage["produced"], requested=coverage["requested"],
+                          excess=suffix)
+                    )
+                )
+            results_column.controls.append(ft.Text(t("storage.physical"), weight=ft.FontWeight.BOLD))
+            for source, quantity in best["stored"].items():
+                results_column.controls.append(
+                    ft.Text(t("storage.quantity", quantity=quantity, item=item_name(source)))
+                )
+        else:
+            results_column.controls.append(ft.Text(t("storage.alternatives"), weight=ft.FontWeight.BOLD))
+            for alt in result["alternatives"][:4]:
+                results_column.controls.append(
+                    ft.Row([
+                        ft.Text(t("storage.cells", count=alt["cost"]), width=90),
+                        ft.Text(describe_rep(alt["terms"], names, translator)),
+                    ])
+                )
+        return animated_cells
+
     async def on_calculate_click(e):
         animation_generation["value"] += 1
+        state["result"] = None
         current_generation = animation_generation["value"]
         active_reveal_generation["value"] = None
         last_grid_groups["value"] = None
@@ -517,70 +596,10 @@ def main(page: ft.Page):
             page.update()
             return
 
-        best = result["best"]
-        last_grid_groups["value"] = best["groups"]
-        sort_button.disabled = False
-        results_column.controls.append(
-            ft.Container(
-                content=ft.Column([
-                    ft.Text(
-                        t("storage.best_combined") if is_portfolio else t("storage.best"),
-                        weight=ft.FontWeight.BOLD,
-                    ),
-                    *([] if is_portfolio else [ft.Text(describe_rep(best["terms"], names, translator))]),
-                    ft.Text(t("storage.cells", count=best["cost"]), size=20, weight=ft.FontWeight.BOLD),
-                ]),
-                bgcolor=ft.Colors.BLACK_45,
-                border_radius=8,
-                padding=12,
-            )
-        )
-        grid, animated_cells = build_cell_grid(
-            best["groups"],
-            names,
-            raw_data,
-            animate_colors=True,
-            sort_mode=grid_sort_mode["value"],
-        )
+        state["result"] = (result, is_portfolio)
+        animated_cells = render_result(result, is_portfolio, animate=True)
         reveal_sort_mode = grid_sort_mode["value"]
         active_reveal_generation["value"] = current_generation
-        grid_column.controls.append(grid)
-        if is_portfolio:
-            results_column.controls.append(ft.Text(t("storage.form"), weight=ft.FontWeight.BOLD))
-            for root_item, choice in best["recipe_choices"].items():
-                results_column.controls.append(
-                    ft.Text(
-                        t("storage.choice", item=item_name(root_item),
-                          description=describe_rep(choice["terms"], names, translator))
-                    )
-                )
-            results_column.controls.append(
-                ft.Text(t("storage.requirements"), weight=ft.FontWeight.BOLD)
-            )
-            for covered_item, coverage in best["coverage"].items():
-                excess = coverage["excess"]
-                suffix = t("storage.excess", count=excess) if excess else ""
-                results_column.controls.append(
-                    ft.Text(
-                        t("storage.coverage", item=item_name(covered_item),
-                          produced=coverage["produced"], requested=coverage["requested"],
-                          excess=suffix)
-                    )
-                )
-            results_column.controls.append(ft.Text(t("storage.physical"), weight=ft.FontWeight.BOLD))
-            for source, quantity in best["stored"].items():
-                results_column.controls.append(
-                    ft.Text(t("storage.quantity", quantity=quantity, item=item_name(source)))
-                )
-        else:
-            results_column.controls.append(ft.Text(t("storage.alternatives"), weight=ft.FontWeight.BOLD))
-            for alt in result["alternatives"][:4]:
-                results_column.controls.append(
-                    ft.Row([
-                        ft.Text(t("storage.cells", count=alt["cost"]), width=90),
-                        ft.Text(describe_rep(alt["terms"], names, translator)),
-                    ])
-                )
         page.update()
 
         # Pause briefly before starting the complete drawing sequence.
@@ -742,8 +761,6 @@ def main(page: ft.Page):
         vertical_alignment=ft.CrossAxisAlignment.STRETCH,
     )
 
-    app_shell = ft.Container(expand=True)
-
     def item_name(item_id):
         return names.get(item_id, item_id)
 
@@ -830,13 +847,29 @@ def main(page: ft.Page):
             ),
         )
 
+    def change_language(e):
+        selected = e.control.value
+        if selected not in SUPPORTED_LANGUAGES or selected == language:
+            return
+        if calculate_button.disabled and storage_items:
+            e.control.value = language
+            page.show_dialog(ft.SnackBar(ft.Text(t("language.busy"))))
+            page.update()
+            return
+        # Invalidate pending reveal coroutines before replacing their controls.
+        animation_generation["value"] += 1
+        state["language"] = selected
+        state["sort"] = grid_sort_mode["value"]
+        build_app(page, app_shell, data, state)
+        page.update()
+
     def build_home_view():
         storage_findings = best_storage_examples(
             db, reverse_index, limit=HOME_ITEM_COUNT
         )
         language_dropdown = ft.Dropdown(
             value=language,
-            disabled=True,
+            on_select=change_language,
             width=190,
             dense=True,
             leading_icon=ft.Icons.LANGUAGE,
@@ -925,8 +958,12 @@ def main(page: ft.Page):
             expand=True,
         )
 
+    for item_id in storage_items:
+        commit_item(item_id)
+    refresh_storage_state()
+    if state["result"] is not None:
+        render_result(*state["result"])
     app_shell.content = build_home_view()
-    page.add(app_shell)
 
 
 if __name__ == "__main__":

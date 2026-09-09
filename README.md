@@ -36,7 +36,7 @@ python3 ui/main.py
 
 ## Localization
 
-The UI currently ships in English. App messages live in `locales/en.json`;
+The UI ships in English and Russian. App messages live in `locales/en.json`;
 use `t("message.key", count=count)` in the UI for new text. Translate whole
 sentences with named placeholders, rather than joining translated words.
 For counts, prefer neutral labels such as `Cells: {count}` until plural rules
@@ -49,9 +49,14 @@ Game-data languages are not the list of supported UI languages.
 
 To add a UI language, create `locales/<locale>.json` and register its code and
 native name in `SUPPORTED_LANGUAGES` in `ui/i18n.py`. Partial catalogs work.
-Set `ARC_STACKERS_LANGUAGE` to that code before starting the app; restart to
-apply changes. Unsupported codes use English. The home language indicator
-is currently disabled; live switching and persistent UI settings are deferred.
+The language selector on the home screen switches languages immediately.
+Selected items, quantities, grid sorting and completed results survive the
+switch; data is reused and results are rendered without recalculation.
+Active reveal animations end on a switch. Finish or cancel an active
+calculation before changing language.
+`ARC_STACKERS_LANGUAGE` selects the initial language (unsupported codes use
+English). Selection lasts for the current session; saving it between launches
+is not implemented yet.
 
 Calculations return IDs, numbers, operation codes and representation `terms`.
 Format those terms with `ui.i18n.describe_rep()` when displaying results.
