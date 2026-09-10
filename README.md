@@ -54,9 +54,15 @@ Selected items, quantities, grid sorting and completed results survive the
 switch; data is reused and results are rendered without recalculation.
 Active reveal animations end on a switch. Finish or cancel an active
 calculation before changing language.
-`ARC_STACKERS_LANGUAGE` selects the initial language (unsupported codes use
-English). Selection lasts for the current session; saving it between launches
-is not implemented yet.
+The selected language is saved automatically and restored on the next launch.
+Preferences live in `settings.json` under
+`platformdirs.user_config_dir("arc-storage-optimizer")`, separately from the
+game-data cache and repository. `core.settings.Settings` loads preferences and
+atomically saves updates while preserving other keys, ready for future settings.
+Missing or invalid files use defaults. Save failures leave the previous file
+intact and show a notice in the UI; the language still changes for the session.
+`ARC_STACKERS_LANGUAGE`, when set, overrides the saved language at startup
+(unsupported values use English). Unset it to use the saved choice.
 
 Calculations return IDs, numbers, operation codes and representation `terms`.
 Format those terms with `ui.i18n.describe_rep()` when displaying results.
