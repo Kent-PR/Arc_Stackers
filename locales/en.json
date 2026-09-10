@@ -30,6 +30,7 @@
   "home.best": "Best compact storage",
   "home.hint": "Keep the source item and recycle or salvage it when you need the material.",
   "language.label": "Language",
+  "settings.save_failed": "The language was changed, but settings could not be saved. It may reset next time you start the app.",
   "language.busy": "Wait for the calculation to finish or cancel it before changing language.",
   "calculation.progress": "Checked {completed} of {total} storage variants",
   "calculation.failed": "Could not calculate storage.",
