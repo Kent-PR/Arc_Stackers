@@ -46,5 +46,21 @@
   "representation.indirect": "{material} (в виде: {source})",
   "representation.separator": " + ",
   "error.request_too_large": "Запрос слишком велик для текущего оптимизатора.",
-  "error.too_many_variants": "Слишком много сочетаний вариантов крафта для текущего точного оптимизатора."
+  "error.too_many_variants": "Слишком много сочетаний вариантов крафта для текущего точного оптимизатора.",
+  "crafting.prototype": "Просмотр рецептов: сравнивайте источники и открывайте вложенный крафт.",
+  "crafting.source": "{method}: {item} × {count}",
+  "crafting.ready": "Найти готовым",
+  "crafting.craft": "Скрафтить",
+  "crafting.recyclesInto": "Переработать",
+  "crafting.salvagesInto": "Разобрать в рейде",
+  "crafting.sources_hint": "Альтернативы для получения всего нужного количества. Расчёт для одного компонента, не общий план.",
+  "crafting.yield": "Выход из одного предмета: {count}",
+  "crafting.open_recipe": "Открыть рецепт",
+  "crafting.inspect_hint": "Выберите компонент, чтобы увидеть способы получения.",
+  "crafting.recipe_for": "{item} × {count}",
+  "crafting.required": "Нужно: {count}",
+  "crafting.show_sources": "Источники →",
+  "crafting.invalid_quantity": "Введите целое число от 1",
+  "crafting.target": "Что крафтим",
+  "crafting.quantity": "Количество"
 }

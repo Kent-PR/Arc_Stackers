@@ -29,6 +29,14 @@ ui/
 
 ## Run
 
+The home screen now opens a Craft Helper recipe explorer. Select a craftable
+item and quantity, inspect each component's ready-made, crafting, recycling,
+and salvage alternatives in the side panel, and navigate nested recipes with
+breadcrumbs. Snap Hook is selected initially when available. Target and ancestor
+items are excluded from breakdown sources. Source quantities cover one component
+at a time; inventory accounting, source selection and a combined crafting plan
+are not implemented in this first interface prototype.
+
 ```
 pip install -r requirements.txt
 python3 ui/main.py

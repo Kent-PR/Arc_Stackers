@@ -16,6 +16,7 @@ import flet as ft
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from ui.i18n import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, Translator, describe_rep
+from ui.crafting import build_craft_helper
 from core.analysis import compute_storage
 from core.containers import build_reverse_index
 from core.dashboard import (
@@ -795,8 +796,9 @@ def build_app(page, app_shell, data, state):
         )
         page.update()
 
-    def show_craft_helper_notice(e=None):
-        page.show_dialog(ft.SnackBar(ft.Text(t("crafting.coming_soon"))))
+    def show_craft_helper(e=None):
+        app_shell.content = build_craft_helper(page, db, names, reverse_index, state, t, show_home)
+        page.update()
 
     def build_storage_finding_card(finding):
         source = finding["best_source"]
@@ -961,7 +963,7 @@ def build_app(page, app_shell, data, state):
                                 width=320,
                                 height=50,
                                 style=primary_button_style,
-                                on_click=show_craft_helper_notice,
+                                on_click=show_craft_helper,
                             ),
                         ],
                         spacing=12,

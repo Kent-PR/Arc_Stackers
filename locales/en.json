@@ -46,5 +46,21 @@
   "representation.indirect": "{material} (as {source})",
   "representation.separator": " + ",
   "error.request_too_large": "The joint request is too large for the current optimizer.",
-  "error.too_many_variants": "There are too many combined crafting-tree variants for the current exact optimizer."
+  "error.too_many_variants": "There are too many combined crafting-tree variants for the current exact optimizer.",
+  "crafting.prototype": "Recipe explorer: compare sources and open nested recipes.",
+  "crafting.source": "{method}: {item} × {count}",
+  "crafting.ready": "Find ready-made",
+  "crafting.craft": "Craft",
+  "crafting.recyclesInto": "Recycle",
+  "crafting.salvagesInto": "Salvage",
+  "crafting.sources_hint": "Alternative ways to cover the full requirement. Counts are per component, not a combined plan.",
+  "crafting.yield": "Output per source item: {count}",
+  "crafting.open_recipe": "Open recipe",
+  "crafting.inspect_hint": "Select a component to inspect its sources.",
+  "crafting.recipe_for": "{item} × {count}",
+  "crafting.required": "Required: {count}",
+  "crafting.show_sources": "Sources →",
+  "crafting.invalid_quantity": "Enter a positive integer",
+  "crafting.target": "Crafting target",
+  "crafting.quantity": "Quantity"
 }
