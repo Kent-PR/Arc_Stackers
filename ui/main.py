@@ -874,6 +874,23 @@ def build_app(page, app_shell, data, state):
         storage_findings = best_storage_examples(
             db, reverse_index, limit=HOME_ITEM_COUNT
         )
+        durable_cloth = raw_data.get("durable_cloth", {})
+        fabric_used = (durable_cloth.get("recipe") or {}).get("fabric", 14)
+        fabric_returned = (durable_cloth.get("recyclesInto") or {}).get("fabric", 6)
+        durable_stack = durable_cloth.get("stackSize") or 10
+        fabric_stack = db.stack_size.get("fabric", 50)
+        fabric_before = fabric_used * durable_stack
+        fabric_after = fabric_returned * durable_stack
+
+        def split_into_cells(quantity, capacity):
+            full_cells, remainder = divmod(quantity, capacity)
+            return [capacity] * full_cells + ([remainder] if remainder else [])
+
+        fabric_cells_before = split_into_cells(fabric_before, fabric_stack)
+        fabric_cells_after = split_into_cells(fabric_after, fabric_stack)
+        compaction_loss = round(
+            (1 - fabric_returned / fabric_used) * 100
+        ) if fabric_used else 57
         language_dropdown = ft.Dropdown(
             value=language,
             on_select=change_language,
@@ -958,6 +975,87 @@ def build_app(page, app_shell, data, state):
                 ft.Column(
                     storage_rows,
                     spacing=12,
+                ),
+                ft.Container(
+                    padding=14,
+                    border_radius=12,
+                    bgcolor="#241D0F",
+                    border=ft.Border.all(1, ft.Colors.AMBER_700),
+                    content=ft.Column(
+                        [
+                            ft.Row(
+                                [
+                                    ft.Icon(
+                                        ft.Icons.WARNING_AMBER_ROUNDED,
+                                        color=ft.Colors.AMBER_400,
+                                    ),
+                                    ft.Text(
+                                        t(
+                                            "home.compaction_disclaimer",
+                                            percent=compaction_loss,
+                                            fabric=item_name("fabric"),
+                                            durable_cloth=item_name("durable_cloth"),
+                                            returned=fabric_returned,
+                                            used=fabric_used,
+                                        ),
+                                        expand=True,
+                                        color=ft.Colors.AMBER_100,
+                                    ),
+                                ],
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            ft.Row(
+                                [
+                                    ft.Row(
+                                        [
+                                            build_item_preview(
+                                                "fabric",
+                                                names,
+                                                raw_data,
+                                                size=HOME_PREVIEW_SIZE,
+                                                quantity=fill,
+                                            )
+                                            for fill in fabric_cells_before
+                                        ],
+                                        spacing=4,
+                                    ),
+                                    ft.Icon(
+                                        ft.Icons.ARROW_FORWARD,
+                                        color=ft.Colors.AMBER_400,
+                                    ),
+                                    build_item_preview(
+                                        "durable_cloth",
+                                        names,
+                                        raw_data,
+                                        size=HOME_PREVIEW_SIZE,
+                                        quantity=durable_stack,
+                                    ),
+                                    ft.Icon(
+                                        ft.Icons.ARROW_FORWARD,
+                                        color=ft.Colors.AMBER_400,
+                                    ),
+                                    ft.Row(
+                                        [
+                                            build_item_preview(
+                                                "fabric",
+                                                names,
+                                                raw_data,
+                                                size=HOME_PREVIEW_SIZE,
+                                                quantity=fill,
+                                            )
+                                            for fill in fabric_cells_after
+                                        ],
+                                        spacing=4,
+                                    ),
+                                ],
+                                spacing=10,
+                                alignment=ft.MainAxisAlignment.CENTER,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                scroll=ft.ScrollMode.AUTO,
+                            ),
+                        ],
+                        spacing=12,
+                    ),
                 ),
             ],
             spacing=12,
