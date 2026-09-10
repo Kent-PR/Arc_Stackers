@@ -22,6 +22,7 @@ from core.dashboard import (
 )
 from core.fetch import ensure_data
 from core.loader import load_items
+from core.settings import Settings
 from core.portfolio import CalculationCancelled, OptimizationError, compute_storage_portfolio
 from ui.widgets import (
     CELL_SIZE,
@@ -98,8 +99,9 @@ def _picker_item_sort_key(item_id, names, raw_data):
 
 
 def main(page: ft.Page):
-    language = os.environ.get("ARC_STACKERS_LANGUAGE", DEFAULT_LANGUAGE)
-    if language not in SUPPORTED_LANGUAGES:
+    settings = Settings()
+    language = os.environ.get("ARC_STACKERS_LANGUAGE", settings.get("language", DEFAULT_LANGUAGE))
+    if not isinstance(language, str) or language not in SUPPORTED_LANGUAGES:
         language = DEFAULT_LANGUAGE
     page.window.maximized = True
     page.padding = 20
@@ -107,6 +109,7 @@ def main(page: ft.Page):
     db, _, raw_data = load_items(items_dir, lang=language)
     data = (db, raw_data, build_reverse_index(db, raw_data))
     state = {"language": language, "items": {}, "sort": "rarity", "result": None}
+    state["settings"] = settings
     app_shell = ft.Container(expand=True)
     build_app(page, app_shell, data, state)
     page.add(app_shell)
@@ -860,7 +863,11 @@ def build_app(page, app_shell, data, state):
         animation_generation["value"] += 1
         state["language"] = selected
         state["sort"] = grid_sort_mode["value"]
+        settings = state.get("settings")
+        saved = settings.update(language=selected) if settings is not None else True
         build_app(page, app_shell, data, state)
+        if not saved:
+            page.show_dialog(ft.SnackBar(ft.Text(Translator(selected).t("settings.save_failed"))))
         page.update()
 
     def build_home_view():
