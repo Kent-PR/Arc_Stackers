@@ -44,12 +44,21 @@ def acquisition_options(db, reverse_index, item, quantity, ancestors=()):
     recipe = db.recipes.get(item)
     if recipe and all(component not in blocked for component, _ in recipe):
         options.append({"kind": "craft", "source": item, "count": quantity})
+    groups = {}
     for candidate in reverse_index.get(item, []):
         if candidate["source"] in blocked or candidate["qty_per_source_unit"] <= 0:
             continue
-        options.append({
+        key = (candidate["method"], candidate["qty_per_source_unit"])
+        if key in groups:
+            if candidate["source"] not in groups[key]["sources"]:
+                groups[key]["sources"].append(candidate["source"])
+            continue
+        group = {
             "kind": candidate["method"], "source": candidate["source"],
+            "sources": [candidate["source"]],
             "count": ceil(quantity / candidate["qty_per_source_unit"]),
             "yield": candidate["qty_per_source_unit"],
-        })
+        }
+        groups[key] = group
+        options.append(group)
     return options

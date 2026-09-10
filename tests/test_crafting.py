@@ -8,6 +8,19 @@ from ui.i18n import Translator
 
 
 class CraftingTests(unittest.TestCase):
+    def test_sources_group_by_yield_and_method_after_excluding_ancestors(self):
+        index = {'part': [
+            {'source': source, 'method': method, 'qty_per_source_unit': output}
+            for source, method, output in [
+                ('target', 'recyclesInto', 2), ('a', 'recyclesInto', 2),
+                ('b', 'recyclesInto', 2), ('a', 'recyclesInto', 2),
+                ('c', 'recyclesInto', 3), ('b', 'salvagesInto', 2),
+            ]
+        ]}
+        options = acquisition_options(Database(), index, 'part', 5, ['target'])[1:]
+        self.assertEqual([['a', 'b'], ['c'], ['b']], [o['sources'] for o in options])
+        self.assertEqual([3, 2, 3], [o['count'] for o in options])
+
     def test_recursive_shortfall_and_find_boundary(self):
         db = Database()
         db.add_recipe('target', 1, [('part', 2), ('rope', 1)])

@@ -49,6 +49,7 @@
   "error.too_many_variants": "There are too many combined crafting-tree variants for the current exact optimizer.",
   "crafting.prototype": "Set your inventory and choose where to stop crafting and find an item instead.",
   "crafting.source": "{method}: {item} × {count}",
+  "crafting.source_group": "{method}: {items}. {count} items total, in any combination.",
   "crafting.ready": "Find ready-made",
   "crafting.craft": "Craft",
   "crafting.recyclesInto": "Recycle",

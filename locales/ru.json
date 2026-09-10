@@ -49,6 +49,7 @@
   "error.too_many_variants": "Слишком много сочетаний вариантов крафта для текущего точного оптимизатора.",
   "crafting.prototype": "Укажите запасы и выберите, какие компоненты скрафтить, а какие найти готовыми.",
   "crafting.source": "{method}: {item} × {count}",
+  "crafting.source_group": "{method}: {items}. Всего {count} шт. в любом сочетании.",
   "crafting.ready": "Найти готовым",
   "crafting.craft": "Скрафтить",
   "crafting.recyclesInto": "Переработать",

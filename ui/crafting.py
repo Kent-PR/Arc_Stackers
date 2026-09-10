@@ -22,6 +22,9 @@ def build_craft_helper(page, db, names, reverse_index, state, t, on_home):
     name = lambda item: names.get(item, item)
 
     def label(option):
+        if len(option.get("sources", [])) > 1:
+            return t("crafting.source_group", method=t("crafting." + option["kind"]),
+                     items=" / ".join(name(i) for i in option["sources"]), count=option["count"])
         return t("crafting.source", method=t("crafting." + option["kind"]),
                  item=name(option["source"]), count=option["count"])
 
