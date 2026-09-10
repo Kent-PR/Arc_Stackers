@@ -47,7 +47,7 @@
   "representation.separator": " + ",
   "error.request_too_large": "Запрос слишком велик для текущего оптимизатора.",
   "error.too_many_variants": "Слишком много сочетаний вариантов крафта для текущего точного оптимизатора.",
-  "crafting.prototype": "Просмотр рецептов: сравнивайте источники и открывайте вложенный крафт.",
+  "crafting.prototype": "Укажите запасы и выберите, какие компоненты скрафтить, а какие найти готовыми.",
   "crafting.source": "{method}: {item} × {count}",
   "crafting.ready": "Найти готовым",
   "crafting.craft": "Скрафтить",
@@ -62,5 +62,14 @@
   "crafting.show_sources": "Источники →",
   "crafting.invalid_quantity": "Введите целое число от 1",
   "crafting.target": "Что крафтим",
-  "crafting.quantity": "Количество"
+  "crafting.quantity": "Количество",
+  "crafting.inventory_hint": "Запасы общие для всех веток и распределяются по порядку рецепта. Ввод применяется по Enter или при выходе из поля.",
+  "crafting.invalid_owned": "Введите целое число от 0",
+  "crafting.owned": "Уже есть",
+  "crafting.balance": "Нужно: {required} · Зачтено из запасов: {used} · Не хватает: {missing}",
+  "crafting.mode_find": "Найду готовым",
+  "crafting.mode_craft": "Скрафтить",
+  "crafting.shopping": "Всего найти для цели",
+  "crafting.nothing_missing": "Все материалы уже есть",
+  "crafting.steps": "Порядок крафта"
 }

@@ -47,7 +47,7 @@
   "representation.separator": " + ",
   "error.request_too_large": "The joint request is too large for the current optimizer.",
   "error.too_many_variants": "There are too many combined crafting-tree variants for the current exact optimizer.",
-  "crafting.prototype": "Recipe explorer: compare sources and open nested recipes.",
+  "crafting.prototype": "Set your inventory and choose where to stop crafting and find an item instead.",
   "crafting.source": "{method}: {item} × {count}",
   "crafting.ready": "Find ready-made",
   "crafting.craft": "Craft",
@@ -62,5 +62,14 @@
   "crafting.show_sources": "Sources →",
   "crafting.invalid_quantity": "Enter a positive integer",
   "crafting.target": "Crafting target",
-  "crafting.quantity": "Quantity"
+  "crafting.quantity": "Quantity",
+  "crafting.inventory_hint": "Inventory is shared across branches, allocated in recipe order. Apply with Enter or by leaving the field.",
+  "crafting.invalid_owned": "Enter an integer from 0",
+  "crafting.owned": "Already owned",
+  "crafting.balance": "Required: {required} · Used from inventory: {used} · Missing: {missing}",
+  "crafting.mode_find": "I will find it",
+  "crafting.mode_craft": "Craft",
+  "crafting.shopping": "Total to find for the target",
+  "crafting.nothing_missing": "All materials are available",
+  "crafting.steps": "Crafting order"
 }

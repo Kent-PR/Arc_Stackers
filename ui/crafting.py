@@ -1,7 +1,7 @@
 """Compact recipe explorer: one recipe level and one source panel at a time."""
 import flet as ft
 
-from core.crafting import acquisition_options
+from core.crafting import acquisition_options, crafting_plan
 
 
 def build_craft_helper(page, db, names, reverse_index, state, t, on_home):
@@ -13,6 +13,9 @@ def build_craft_helper(page, db, names, reverse_index, state, t, on_home):
     session["item"] = root
     session.setdefault("quantity", 1)
     path = []
+    owned = session.setdefault("owned", {})
+    choices = session.setdefault("choices", {})
+    plan = {}
     recipe_column = ft.Column(spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)
     sources = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO, expand=True)
     breadcrumbs = ft.Row(wrap=True)
@@ -33,6 +36,7 @@ def build_craft_helper(page, db, names, reverse_index, state, t, on_home):
                 controls.append(ft.Text(t("crafting.yield", count=option["yield"])))
             if option["kind"] == "craft":
                 def descend(e, target=item, quantity=count):
+                    choices[tuple(entry[0] for entry in path) + (target,)] = "craft"
                     path.append((target, quantity))
                     render()
                     page.update()
@@ -49,26 +53,73 @@ def build_craft_helper(page, db, names, reverse_index, state, t, on_home):
         return handler
 
     def render():
+        nonlocal plan
+        if not session["item"]:
+            return
+        plan = crafting_plan(db, session["item"], session["quantity"], owned, choices)
+        while path and tuple(entry[0] for entry in path) not in plan["nodes"]:
+            path.pop()
         breadcrumbs.controls = [ft.TextButton(name(item), on_click=back_to(index))
                                 for index, (item, _) in enumerate(path)]
         recipe_column.controls = []
         sources.controls = [ft.Text(t("crafting.inspect_hint"), color=ft.Colors.GREY_400)]
         if not path:
             return
-        item, count = path[-1]
-        recipe_column.controls.append(ft.Text(t("crafting.recipe_for", item=name(item), count=count),
+        node = plan["nodes"][tuple(entry[0] for entry in path)]
+        recipe_column.controls.append(ft.Text(t("crafting.recipe_for", item=name(node["item"]), count=node["missing"]),
                                               size=22, weight=ft.FontWeight.BOLD))
-        for component, per_unit in db.recipes.get(item, []):
-            required = per_unit * count
+        recipe_column.controls.append(ft.Text(t("crafting.inventory_hint")))
+        for child in node["children"]:
+            component, required = child["item"], child["missing"]
             def open_sources(e, target=component, quantity=required):
                 inspect(target, quantity)
-            recipe_column.controls.append(ft.Container(
-                padding=16, border_radius=12, bgcolor="#111622",
-                content=ft.Row([
-                    ft.Column([ft.Text(name(component), size=18, weight=ft.FontWeight.BOLD),
-                               ft.Text(t("crafting.required", count=required))], expand=True),
-                    ft.OutlinedButton(t("crafting.show_sources"), on_click=open_sources),
-                ])))
+
+            def inventory_change(e, target=component):
+                try:
+                    value = int(e.control.value)
+                    if value < 0:
+                        raise ValueError
+                except (ValueError, TypeError):
+                    e.control.error_text = t("crafting.invalid_owned")
+                    page.update()
+                    return
+                owned[target] = value
+                render()
+                page.update()
+
+            def mode_change(e, key=child["path"]):
+                choices[key] = e.control.value
+                render()
+                page.update()
+
+            def descend(e, target=component, quantity=required):
+                path.append((target, quantity))
+                render()
+                page.update()
+
+            details = [ft.Text(name(component), size=18, weight=ft.FontWeight.BOLD),
+                       ft.Text(t("crafting.balance", required=child["required"], used=child["used"], missing=required))]
+            actions = [ft.TextField(value=str(owned.get(component, 0)), width=150,
+                                   label=t("crafting.owned"), on_blur=inventory_change,
+                                   on_submit=inventory_change)]
+            if child["can_craft"]:
+                actions.append(ft.Dropdown(value=child["mode"], width=180,
+                    options=[ft.DropdownOption(key=k, text=t("crafting.mode_" + k)) for k in ("find", "craft")],
+                    on_select=mode_change))
+            else:
+                actions.append(ft.Text(t("crafting.mode_find")))
+            if child["children"]:
+                actions.append(ft.OutlinedButton(t("crafting.open_recipe"), on_click=descend))
+            actions.append(ft.OutlinedButton(t("crafting.show_sources"), on_click=open_sources, disabled=required == 0))
+            recipe_column.controls.append(ft.Container(padding=16, border_radius=12, bgcolor="#111622",
+                content=ft.Column(details + [ft.Row(actions, wrap=True)])))
+        recipe_column.controls.extend([ft.Divider(), ft.Text(t("crafting.shopping"), size=20, weight=ft.FontWeight.BOLD)])
+        recipe_column.controls.extend(ft.Text(f"{name(i)} × {n}") for i, n in plan["shopping"].items())
+        if not plan["shopping"]:
+            recipe_column.controls.append(ft.Text(t("crafting.nothing_missing")))
+        recipe_column.controls.append(ft.Text(t("crafting.steps"), size=20, weight=ft.FontWeight.BOLD))
+        recipe_column.controls.extend(ft.Text(f"{index}. {name(step['item'])} × {step['count']}")
+                                      for index, step in enumerate(plan["steps"], 1))
 
     def reset():
         path[:] = [(session["item"], session["quantity"])] if session["item"] else []
