@@ -41,6 +41,7 @@
   "storage.quantity": "{quantity} × {item}",
   "home.recommendation": "Храни материал «{material}» в виде предмета «{source}»",
   "home.density": "+{percent}% к плотности хранения",
+  "home.compaction_disclaimer": "При уплотнении может теряться до {percent}% ресурсов. Например, материал «{fabric}» всегда плотнее хранить в виде предмета «{durable_cloth}», но после его переработки вернётся только {returned} из {used} единиц материала «{fabric}», потраченных на создание.",
   "home.comparison": "1 ячейка ({density} × {material}) вместо {cells} ({fills})",
   "representation.indirect": "{material} (в виде: {source})",
   "representation.separator": " + ",

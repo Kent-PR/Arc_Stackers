@@ -41,6 +41,7 @@
   "storage.quantity": "{quantity} × {item}",
   "home.recommendation": "Store {material} as {source}",
   "home.density": "+{percent}% storage density",
+  "home.compaction_disclaimer": "Compacting can lose up to {percent}% of resources. For example, {fabric} is always denser when stored as {durable_cloth}, but recycling it returns only {returned} of the {used} {fabric} used to craft it.",
   "home.comparison": "1 cell ({density} × {material}) instead of {cells} ({fills})",
   "representation.indirect": "{material} (as {source})",
   "representation.separator": " + ",
