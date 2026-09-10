@@ -9,6 +9,7 @@ import queue
 import random
 import sys
 import threading
+from pathlib import Path
 
 import flet as ft
 
@@ -40,6 +41,7 @@ from ui.reveal import (
 )
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
+APP_ICON = Path(__file__).resolve().parents[1] / "media" / "app.ico"
 SORT_BUTTON_HEIGHT = 44
 SORT_BUTTON_RADIUS = SORT_BUTTON_HEIGHT / 2
 HOVER_SAFE_AREA = 16
@@ -103,6 +105,7 @@ def main(page: ft.Page):
     language = os.environ.get("ARC_STACKERS_LANGUAGE", settings.get("language", DEFAULT_LANGUAGE))
     if not isinstance(language, str) or language not in SUPPORTED_LANGUAGES:
         language = DEFAULT_LANGUAGE
+    page.window.icon = str(APP_ICON)
     page.window.maximized = True
     page.padding = 20
     items_dir = ensure_data(on_status=lambda m: print(m))
