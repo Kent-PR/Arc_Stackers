@@ -30,8 +30,12 @@ class LocalizationTests(unittest.TestCase):
         db.add_raw('wire', 10)
         raw = {'wire': {'name': {'en': 'Wire', 'ru': 'Провод'}, 'stackSize': 10}}
         result = compute_storage(db, 'wire', 12)
+        from core.settings import Settings
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        settings_path = Path(directory.name) / 'settings.json'
         state = {'language': 'en', 'items': {'wire': 12}, 'sort': 'value',
-                 'result': (result, False)}
+                 'result': (result, False), 'settings': Settings(settings_path)}
         page = SimpleNamespace(update=lambda: None)
         shell = ft.Container()
         with patch('ui.main.compute_storage', side_effect=AssertionError('Recalculation')):
@@ -43,6 +47,7 @@ class LocalizationTests(unittest.TestCase):
                 dropdown = next(c for c in walk(shell) if isinstance(c, ft.Dropdown))
                 dropdown.value = language
                 dropdown.on_select(SimpleNamespace(control=dropdown))
+                self.assertEqual(language, Settings(settings_path).get('language'))
                 self.assertEqual(title, page.title)
                 self.assertEqual({'wire': 12}, state['items'])
                 self.assertIs(result, state['result'][0])
