@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 LOCALES_DIR = Path(__file__).resolve().parents[1] / "locales"
-SUPPORTED_LANGUAGES = {"en": "English", "ru": "Русский"}
+SUPPORTED_LANGUAGES = {"en": "English", "ru": "Русский", "es": "Español"}
 DEFAULT_LANGUAGE = "en"
 logger = logging.getLogger(__name__)
 
