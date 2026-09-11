@@ -14,6 +14,19 @@ from ui.i18n import Translator, describe_rep
 
 
 class LocalizationTests(unittest.TestCase):
+    def test_nested_catalog_falls_back_per_message(self):
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, 'en.json').write_text(json.dumps({
+                'storage': {'sort': {'rarity': 'Rarity', 'value': 'Value'}}
+            }), encoding='utf-8')
+            Path(directory, 'ru.json').write_text(json.dumps({
+                'storage': {'sort': {'rarity': 'Редкость'}}
+            }), encoding='utf-8')
+            translator = Translator('ru', directory)
+            self.assertEqual('Редкость', translator.t('storage.sort.rarity'))
+            with self.assertLogs('ui.i18n', level='WARNING'):
+                self.assertEqual('Value', translator.t('storage.sort.value'))
+
     def test_live_switch_preserves_result_and_items_without_recalculation(self):
         import flet as ft
         from ui.main import build_app
@@ -42,7 +55,7 @@ class LocalizationTests(unittest.TestCase):
             build_app(page, shell, (db, raw, {}), state)
             for language, title, button_label in [
                 ('ru', 'Оптимизатор хранилища ARC Raiders', 'Оптимизатор хранения'),
-                ('en', 'ARC Raiders Storage Optimizer', 'Storage optimizer'),
+                ('en', 'ARC Raiders Stash Optimizer', 'Stash optimizer'),
             ]:
                 dropdown = next(c for c in walk(shell) if isinstance(c, ft.Dropdown))
                 dropdown.value = language
@@ -154,7 +167,7 @@ class LocalizationTests(unittest.TestCase):
                 )
             with patch('ui.main.ensure_data', return_value=directory):
                 main(page)
-        self.assertEqual('ARC Raiders Storage Optimizer', page.title)
+        self.assertEqual('ARC Raiders Stash Optimizer', page.title)
         self.assertEqual(1, len(controls))
 
 

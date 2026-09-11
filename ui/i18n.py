@@ -9,14 +9,34 @@ DEFAULT_LANGUAGE = "en"
 logger = logging.getLogger(__name__)
 
 
+def _load_catalog(path):
+    """Flatten nested groups so callers can keep using dotted message keys."""
+    messages = {}
+
+    def visit(group, prefix=""):
+        for name, value in group.items():
+            key = f"{prefix}.{name}" if prefix else name
+            if isinstance(value, dict):
+                visit(value, key)
+            elif isinstance(value, str):
+                if key in messages:
+                    raise ValueError(f"Duplicate translation key: {key}")
+                messages[key] = value
+            else:
+                raise ValueError(f"Translation must be a string: {key}")
+
+    visit(json.loads(path.read_text(encoding="utf-8")))
+    return messages
+
+
 class Translator:
     def __init__(self, language=DEFAULT_LANGUAGE, locales_dir=LOCALES_DIR):
         self.language = language
         directory = Path(locales_dir)
-        self.fallback = json.loads((directory / "en.json").read_text(encoding="utf-8"))
+        self.fallback = _load_catalog(directory / "en.json")
         # Do not use an arbitrary locale string as a filesystem path.
         path = next((p for p in directory.glob("*.json") if p.stem == language), None)
-        self.messages = json.loads(path.read_text(encoding="utf-8")) if path else {}
+        self.messages = _load_catalog(path) if path else {}
         self._missing = set()
 
     def t(self, key, **parameters):
