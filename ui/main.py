@@ -1010,11 +1010,11 @@ def build_app(page, app_shell, data, state):
                                 style=primary_button_style,
                                 on_click=show_storage_optimizer,
                             ),
-                            ft.OutlinedButton(
+                            ft.Button(
                                 content=t("navigation.crafting"),
                                 icon=ft.Icons.HANDYMAN,
                                 width=320,
-                                height=50,
+                                height=54,
                                 style=primary_button_style,
                                 on_click=show_craft_helper,
                             ),
