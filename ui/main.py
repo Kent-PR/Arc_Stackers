@@ -981,13 +981,16 @@ def build_app(page, app_shell, data, state):
                     storage_rows,
                     spacing=12,
                 ),
-                ft.Container(
-                    padding=14,
-                    border_radius=12,
-                    bgcolor="#241D0F",
-                    border=ft.Border.all(1, ft.Colors.AMBER_700),
-                    content=ft.Column(
-                        [
+                ft.Row(
+                    [
+                        ft.Container(
+                            width=900,
+                            padding=14,
+                            border_radius=12,
+                            bgcolor="#241D0F",
+                            border=ft.Border.all(1, ft.Colors.AMBER_700),
+                            content=ft.Column(
+                                [
                             ft.Row(
                                 [
                                     ft.Icon(
@@ -1056,11 +1059,13 @@ def build_app(page, app_shell, data, state):
                                 spacing=10,
                                 alignment=ft.MainAxisAlignment.CENTER,
                                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                                scroll=ft.ScrollMode.AUTO,
                             ),
-                        ],
-                        spacing=12,
-                    ),
+                                ],
+                                spacing=12,
+                            ),
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
                 ),
             ],
             spacing=12,
