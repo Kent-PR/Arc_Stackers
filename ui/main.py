@@ -7,9 +7,11 @@ import os
 import logging
 import queue
 import random
+import re
 import sys
 import threading
 from pathlib import Path
+from string import Formatter
 
 import flet as ft
 
@@ -28,7 +30,9 @@ from core.settings import Settings
 from core.portfolio import CalculationCancelled, OptimizationError, compute_storage_portfolio
 from ui.widgets import (
     CELL_SIZE,
+    DEFAULT_RARITY_COLOR,
     GRID_WIDTH,
+    RARITY_COLORS,
     build_cell_grid,
     build_hover_wrapper,
     build_item_preview,
@@ -771,6 +775,54 @@ def build_app(page, app_shell, data, state):
     def item_name(item_id):
         return names.get(item_id, item_id)
 
+    def highlighted_item_text(
+        key,
+        item_fields,
+        parameters=None,
+        *,
+        size=None,
+        weight=None,
+        color=None,
+        expand=False,
+    ):
+        """Render localized prose with item names on solid rarity badges."""
+        parameters = dict(parameters or {})
+        parameters.update({field: "{" + field + "}" for field in item_fields})
+        template = t(key, **parameters)
+        controls = []
+        for literal, field, _, _ in Formatter().parse(template):
+            controls.extend(
+                ft.Text(token, size=size, weight=weight, color=color)
+                for token in re.findall(r"\S+\s*", literal)
+            )
+            if field is None:
+                continue
+            item_id = item_fields[field]
+            rarity = str(raw_data.get(item_id, {}).get("rarity", "")).lower()
+            rarity_color = RARITY_COLORS.get(rarity, DEFAULT_RARITY_COLOR)
+            controls.append(
+                ft.Container(
+                    padding=ft.Padding.symmetric(horizontal=5, vertical=2),
+                    border_radius=4,
+                    bgcolor=ft.Colors.with_opacity(0.85, rarity_color),
+                    content=ft.Text(
+                        item_name(item_id),
+                        size=size,
+                        color=ft.Colors.WHITE,
+                        weight=ft.FontWeight.BOLD,
+                        no_wrap=True,
+                    ),
+                )
+            )
+        return ft.Row(
+            controls,
+            spacing=0,
+            run_spacing=4,
+            wrap=True,
+            expand=expand,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
     def show_home(e=None):
         app_shell.content = build_home_view()
         page.update()
@@ -840,8 +892,9 @@ def build_app(page, app_shell, data, state):
                         alignment=ft.MainAxisAlignment.CENTER,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
-                    ft.Text(
-                        t("home.recommendation", material=item_name(material), source=item_name(source)),
+                    highlighted_item_text(
+                        "home.recommendation",
+                        {"material": material, "source": source},
                         weight=ft.FontWeight.BOLD,
                         size=15,
                     ),
@@ -997,15 +1050,17 @@ def build_app(page, app_shell, data, state):
                                         ft.Icons.WARNING_AMBER_ROUNDED,
                                         color=ft.Colors.AMBER_400,
                                     ),
-                                    ft.Text(
-                                        t(
-                                            "home.compaction_disclaimer",
-                                            percent=compaction_loss,
-                                            fabric=item_name("fabric"),
-                                            durable_cloth=item_name("durable_cloth"),
-                                            returned=fabric_returned,
-                                            used=fabric_used,
-                                        ),
+                                    highlighted_item_text(
+                                        "home.compaction_disclaimer",
+                                        {
+                                            "fabric": "fabric",
+                                            "durable_cloth": "durable_cloth",
+                                        },
+                                        {
+                                            "percent": compaction_loss,
+                                            "returned": fabric_returned,
+                                            "used": fabric_used,
+                                        },
                                         expand=True,
                                         color=ft.Colors.AMBER_100,
                                     ),
