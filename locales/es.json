@@ -1,0 +1,100 @@
+{
+  "app": {
+    "title": "Optimizador del alijo de ARC Raiders"
+  },
+  "storage": {
+    "add": "Añadir objeto",
+    "calculate": "Calcular almacenamiento",
+    "empty": "Selecciona un objeto y realiza el cálculo para ver su distribución en el alijo.",
+    "sort": {
+      "rarity": "Ordenar: rareza",
+      "value": "Ordenar: valor"
+    },
+    "choose": "Elegir objeto",
+    "search": "Buscar objetos",
+    "remove": "Quitar",
+    "unstorable": "Este objeto no se puede almacenar (se desconoce el tamaño de la pila).",
+    "best_combined": "Mejor plan de almacenamiento conjunto",
+    "best": "Mejor método de almacenamiento",
+    "form": "Forma de almacenamiento",
+    "requirements": "Materiales necesarios",
+    "physical": "Objetos almacenados físicamente",
+    "alternatives": "Otras opciones:",
+    "title": "Calculadora de almacenamiento",
+    "cells": "Casillas: {count}",
+    "choice": "{item} → {description}",
+    "excess": " (+{count} de excedente)",
+    "coverage": "{item}: {produced} / {requested}{excess}",
+    "quantity": "{quantity} × {item}"
+  },
+  "validation": {
+    "positive_integer": "Número entero positivo"
+  },
+  "calculation": {
+    "preparing": "Preparando variantes de almacenamiento…",
+    "cancel": "Cancelar cálculo",
+    "cancelling": "Cancelando…",
+    "cancelled": "Cálculo cancelado.",
+    "progress": "Se han comprobado {completed} de {total} variantes de almacenamiento",
+    "failed": "No se pudo calcular el almacenamiento."
+  },
+  "navigation": {
+    "home": "Volver al inicio",
+    "storage": "Optimizador del alijo",
+    "crafting": "Asistente de fabricación"
+  },
+  "crafting": {
+    "coming_soon": "El asistente de fabricación estará disponible próximamente.",
+    "prototype": "Configura tu inventario y elige en qué punto dejar de fabricar y buscar un objeto en su lugar.",
+    "source": "{method}: {item} × {count}",
+    "source_group": "{method}: {items}. {count} objetos en total, en cualquier combinación.",
+    "ready": "Buscar ya fabricado",
+    "craft": "Fabricar",
+    "recyclesInto": "Reciclar",
+    "salvagesInto": "Desmantelar",
+    "sources_hint": "Formas alternativas de cubrir todos los requisitos. Las cantidades corresponden a cada componente, no a un plan conjunto.",
+    "yield": "Cantidad obtenida por objeto de origen: {count}",
+    "open_recipe": "Abrir receta",
+    "inspect_hint": "Selecciona un componente para consultar cómo obtenerlo.",
+    "recipe_for": "{item} × {count}",
+    "required": "Cantidad necesaria: {count}",
+    "show_sources": "Cómo obtenerlo →",
+    "invalid_quantity": "Introduce un número entero positivo",
+    "target": "Objeto que fabricar",
+    "quantity": "Cantidad",
+    "inventory_hint": "El inventario se comparte entre las ramas y se asigna según el orden de la receta. Pulsa Intro o sal del campo para aplicar los cambios.",
+    "invalid_owned": "Introduce un número entero igual o mayor que 0",
+    "owned": "Ya en el inventario",
+    "balance": "Necesario: {required} · Usado del inventario: {used} · Falta: {missing}",
+    "mode_find": "Lo buscaré",
+    "mode_craft": "Fabricar",
+    "shopping": "Total que buscar para fabricar el objeto",
+    "nothing_missing": "Todos los materiales están disponibles",
+    "steps": "Orden de fabricación"
+  },
+  "home": {
+    "headline": "Aprovecha cada casilla del alijo",
+    "description": "Encuentra la forma más compacta de guardar tus objetos y materiales.",
+    "best": "Mejores opciones de almacenamiento compacto",
+    "hint": "Guarda el objeto de origen y recíclalo o desmantélalo cuando necesites el material.",
+    "recommendation": "Almacena {material} en forma de {source}",
+    "density": "+{percent}% de densidad de almacenamiento",
+    "compaction_disclaimer": "La compactación puede suponer una pérdida de hasta el {percent}% de los recursos. Por ejemplo, {fabric} siempre ocupa menos espacio si se almacena en forma de {durable_cloth}, pero al reciclarlo solo se recuperan {returned} de las {used} unidades de {fabric} utilizadas para fabricarlo.",
+    "comparison": "1 casilla ({density} × {material}) en lugar de {cells} ({fills})"
+  },
+  "language": {
+    "label": "Idioma",
+    "busy": "Espera a que termine el cálculo o cancélalo antes de cambiar de idioma."
+  },
+  "settings": {
+    "save_failed": "Se ha cambiado el idioma, pero no se ha podido guardar la configuración. La selección podría restablecerse al iniciar la aplicación de nuevo."
+  },
+  "representation": {
+    "indirect": "{material} (en forma de {source})",
+    "separator": " + "
+  },
+  "error": {
+    "request_too_large": "La solicitud conjunta es demasiado grande para el optimizador actual.",
+    "too_many_variants": "Hay demasiadas combinaciones de variantes del árbol de fabricación para el optimizador exacto actual."
+  }
+}
