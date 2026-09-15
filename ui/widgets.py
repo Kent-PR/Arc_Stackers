@@ -54,7 +54,8 @@ RARITY_RANK = {
 DEFAULT_RARITY_COLOR = ft.Colors.GREY_400
 ITEM_CARD_BACKGROUND = "#090C19"
 ITEM_CARD_FOOTER_COLOR = "#141725"
-FRAME_DIR = Path(__file__).resolve().parents[1] / "media"
+MEDIA_DIR = Path(__file__).resolve().parents[1] / "media"
+FRAME_DIR = MEDIA_DIR / "icons" / "frames"
 
 
 def card_corner_radius(size):
@@ -72,6 +73,27 @@ def _rarity_frame_bytes(rarity):
         return None
 
 
+@lru_cache(maxsize=8)
+def _byproduct_overlay_svg(size):
+    """Rounded grey veil with diagonal hatching for secondary outputs."""
+    radius = card_corner_radius(size)
+    return f"""
+        <svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}">
+          <defs>
+            <pattern id="hatch" width="12" height="12"
+                     patternUnits="userSpaceOnUse">
+              <path d="M-3 3L3-3 M0 12L12 0 M9 15L15 9"
+                    fill="none" stroke="white" stroke-opacity="0.75"
+                    stroke-width="1"/>
+            </pattern>
+          </defs>
+          <rect width="{size}" height="{size}" rx="{radius}"
+                fill="#808080" fill-opacity="0.15"/>
+          <rect width="{size}" height="{size}" rx="{radius}" fill="url(#hatch)"/>
+        </svg>
+    """.encode("utf-8")
+
+
 def _build_item_surface(
     item_id,
     item_name,
@@ -81,6 +103,7 @@ def _build_item_surface(
     padding,
     font_size,
     quantity=None,
+    hatched=False,
 ):
     """Place the Figma rarity frame and item art over the game-dark surface."""
     controls = [
@@ -140,6 +163,16 @@ def _build_item_surface(
             ),
         )
     )
+    if hatched:
+        controls.append(
+            ft.Image(
+                src=_byproduct_overlay_svg(size),
+                width=size,
+                height=size,
+                fit=ft.BoxFit.FILL,
+                exclude_from_semantics=True,
+            )
+        )
     if quantity is not None:
         controls.append(
             ft.Container(
@@ -301,7 +334,9 @@ def _cell_sort_key(occupant, fill, names, item_data, sort_mode="rarity"):
     return -RARITY_RANK.get(rarity, 0), *name_key
 
 
-def build_item_preview(item_id, names, item_data, size=52, quantity=None):
+def build_item_preview(
+    item_id, names, item_data, size=52, quantity=None, hatched=False
+):
     """Build a rarity-backed preview that replaces its name with artwork."""
     data = item_data.get(item_id, {})
     rarity = str(data.get("rarity", "")).lower()
@@ -322,6 +357,7 @@ def build_item_preview(item_id, names, item_data, size=52, quantity=None):
         padding=padding,
         font_size=font_size,
         quantity=quantity,
+        hatched=hatched,
     )
 
 
@@ -459,9 +495,11 @@ def _artwork_hover_handlers(artwork, on_enter, on_hover, on_exit):
 def build_hover_wrapper(content, width, height, border_radius=8, on_tap=None):
     """Wrap an opaque control in the same external hover ring as grid cells."""
     margin = HOVER_BORDER_MARGIN
+    hover_width = width + margin * 2
+    hover_height = height + margin * 2
     hover_border, on_enter, on_hover, on_exit = _build_hover_border(
-        width=width + margin * 2,
-        height=height + margin * 2,
+        width=hover_width,
+        height=hover_height,
         border_radius=_proportional_outer_radius(
             border_radius, width, height, margin
         ),

@@ -20,16 +20,25 @@ class DashboardTests(unittest.TestCase):
     def test_storage_example_contains_visual_cell_fills(self):
         db = Database()
         db.add_raw("sensor", 5)
+        db.add_raw("wire", 10)
         db.add_raw("radio", 3)
         raw = {
             "sensor": {"stackSize": 5},
-            "radio": {"stackSize": 3, "recyclesInto": {"sensor": 3}},
+            "wire": {"stackSize": 10},
+            "radio": {
+                "stackSize": 3,
+                "recyclesInto": {"sensor": 3, "wire": 2},
+            },
         }
         examples = best_storage_examples(db, build_reverse_index(db, raw))
         self.assertEqual([5, 4], examples[0]["raw_cell_fills"])
         self.assertEqual(80, examples[0]["density_gain_percent"])
         self.assertEqual(3, examples[0]["yield_per_source"])
         self.assertEqual(3, examples[0]["source_stack_size"])
+        self.assertEqual(
+            [{"material": "wire", "quantity": 6, "fills": [6]}],
+            examples[0]["byproducts"],
+        )
 
     def test_dismantling_ranks_by_saved_space(self):
         db = Database()

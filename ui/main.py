@@ -46,7 +46,7 @@ from ui.reveal import (
 )
 
 ITEMS_DIR = None  # resolved at startup via core.fetch.ensure_data()
-APP_ICON = Path(__file__).resolve().parents[1] / "media" / "app.ico"
+APP_ICON = Path(__file__).resolve().parents[1] / "media" / "icons" / "app.ico"
 SORT_BUTTON_HEIGHT = 44
 SORT_BUTTON_RADIUS = SORT_BUTTON_HEIGHT / 2
 HOVER_SAFE_AREA = 16
@@ -793,7 +793,7 @@ def build_app(page, app_shell, data, state):
         for literal, field, _, _ in Formatter().parse(template):
             controls.extend(
                 ft.Text(token, size=size, weight=weight, color=color)
-                for token in re.findall(r"\S+\s*", literal)
+                for token in re.findall(r"\s*\S+\s*", literal)
             )
             if field is None:
                 continue
@@ -855,6 +855,28 @@ def build_app(page, app_shell, data, state):
     def build_storage_finding_card(finding):
         source = finding["best_source"]
         material = finding["material"]
+        result_cells = [
+            build_item_preview(
+                material,
+                names,
+                raw_data,
+                size=HOME_PREVIEW_SIZE,
+                quantity=fill,
+            )
+            for fill in finding["raw_cell_fills"]
+        ]
+        result_cells.extend(
+            build_item_preview(
+                byproduct["material"],
+                names,
+                raw_data,
+                size=HOME_PREVIEW_SIZE,
+                quantity=fill,
+                hatched=True,
+            )
+            for byproduct in finding["byproducts"]
+            for fill in byproduct["fills"]
+        )
         return ft.Container(
             expand=True,
             padding=14,
@@ -874,16 +896,7 @@ def build_app(page, app_shell, data, state):
                             ),
                             ft.Icon(ft.Icons.ARROW_FORWARD, color=ft.Colors.CYAN_300),
                             ft.Row(
-                                [
-                                    build_item_preview(
-                                        material,
-                                        names,
-                                        raw_data,
-                                        size=HOME_PREVIEW_SIZE,
-                                        quantity=fill,
-                                    )
-                                    for fill in finding["raw_cell_fills"]
-                                ],
+                                result_cells,
                                 spacing=4,
                                 expand=True,
                                 alignment=ft.MainAxisAlignment.START,

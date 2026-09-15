@@ -26,10 +26,32 @@ def best_storage_examples(db, reverse_index, limit=5):
             if candidate["source"] == finding["best_source"]
             and candidate["method"] == finding["method"]
         )
+        byproducts = []
+        for material, candidates in reverse_index.items():
+            if material == finding["material"]:
+                continue
+            for other in candidates:
+                if (
+                    other["source"] != finding["best_source"]
+                    or other["method"] != finding["method"]
+                ):
+                    continue
+                quantity = other["qty_per_source_unit"] * candidate["source_stack_size"]
+                stack_size = db.stack_size[material]
+                byproducts.append({
+                    "material": material,
+                    "quantity": quantity,
+                    "fills": [
+                        min(stack_size, quantity - offset)
+                        for offset in range(0, quantity, stack_size)
+                    ],
+                })
+        byproducts.sort(key=lambda product: product["material"])
         examples.append({
             **finding,
             "yield_per_source": candidate["qty_per_source_unit"],
             "source_stack_size": candidate["source_stack_size"],
+            "byproducts": byproducts,
             "density_gain_percent": round((finding["gain"] - 1) * 100),
             "raw_cell_fills": [
                 min(raw_density, density - offset)
