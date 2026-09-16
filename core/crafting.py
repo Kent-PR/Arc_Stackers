@@ -27,8 +27,12 @@ def crafting_plan(db, item, quantity, owned=None, choices=None):
                     mode=mode, can_craft=can_craft, path=path, children=[])
         nodes[path] = node
         if missing and mode == 'craft':
-            node['children'] = [visit(c, n * missing, path + (c,)) for c, n in recipe]
-            steps.append({'item': current, 'count': missing})
+            batches = ceil(missing / db.craft_quantity.get(current, 1))
+            produced = batches * db.craft_quantity.get(current, 1)
+            node['children'] = [visit(c, n * batches, path + (c,)) for c, n in recipe]
+            node['batches'] = batches
+            node['produced'] = produced
+            steps.append({'item': current, 'count': produced})
         elif missing:
             shopping[current] = shopping.get(current, 0) + missing
         return node

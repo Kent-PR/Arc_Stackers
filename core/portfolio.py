@@ -283,7 +283,9 @@ def compute_storage_portfolio(
     combination_count = 1
     for item_id in root_items:
         _check_cancelled(should_cancel)
-        reps = enumerate_representations(db, item_id, reverse_index={})
+        reps = enumerate_representations(
+            db, item_id, requested[item_id], reverse_index={}
+        )
         representation_options.append(reps)
         combination_count *= len(reps)
         if combination_count > MAX_REPRESENTATION_COMBINATIONS:
@@ -302,14 +304,16 @@ def compute_storage_portfolio(
         requirements = {}
         recipe_choices = {}
         for root_item, rep in zip(root_items, chosen_reps):
-            multiplier = requested[root_item]
             recipe_choices[root_item] = {
-                "terms": rep,
+                "terms": {
+                    key: quantity / requested[root_item]
+                    for key, quantity in rep.items()
+                },
             }
-            for term_key, quantity_per_root in rep.items():
+            for term_key, quantity in rep.items():
                 material = term_key[1]
                 requirements[material] = (
-                    requirements.get(material, 0) + quantity_per_root * multiplier
+                    requirements.get(material, 0) + quantity
                 )
 
         requirements_key = tuple(sorted(requirements.items()))

@@ -44,7 +44,12 @@ def load_items(items_dir, lang="en"):
 
         recipe = data.get("recipe")
         if recipe:
-            db.add_recipe(item_id, stack, list(recipe.items()))
+            db.add_recipe(
+                item_id,
+                stack,
+                list(recipe.items()),
+                craft_quantity=data.get("craftQuantity", 1),
+            )
         else:
             db.add_raw(item_id, stack)
 

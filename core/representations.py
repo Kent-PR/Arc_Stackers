@@ -3,7 +3,9 @@ and computes their cell cost.
 
 A "representation" is one way of holding the materials needed for N units
 of a root item - e.g. fully assembled, fully raw, or some partial mix.
-Internally a representation is a dict {term_key: qty_per_1_unit_of_root}
+Internally a representation is a dict {term_key: concrete_quantity} for the
+requested number of root items. Public analysis results normalize these values
+back to the historical per-root format used by the UI.
 where term_key is one of:
 
     ("raw", item_id)
@@ -42,6 +44,7 @@ from math import ceil
 def enumerate_representations(
     db,
     item,
+    quantity=1,
     reverse_index=None,
     expandable_nodes=None,
     allowed_container_sources=None,
@@ -50,10 +53,14 @@ def enumerate_representations(
     reverse_index = reverse_index or {}
     if cache is None:
         cache = {}
-    if item in cache:
-        return cache[item]
+    cache_key = (item, quantity)
+    if cache_key in cache:
+        return cache[cache_key]
 
-    options = [{("raw", item): 1}]  # always available: keep this item as-is
+    # Representations contain concrete quantities for the requested amount.
+    # This is necessary for batch recipes: requesting 1 or 20 rounds both
+    # require one full crafting batch, not 1/20 of its ingredients.
+    options = [{("raw", item): quantity}]
 
     # container substitution option, if permitted and denser than raw storage
     raw_stack = db.stack_size.get(item)
@@ -66,20 +73,26 @@ def enumerate_representations(
             )
             if permitted and cand["density"] > raw_stack:
                 term_key = ("container",) + key_tuple
-                options.append({term_key: 1})
+                options.append({term_key: quantity})
 
     # recipe expansion, if this item is craftable and expansion is permitted here
     may_expand = item in db.recipes and (
         expandable_nodes is None or item in expandable_nodes
     )
     if may_expand:
+        batches = ceil(quantity / db.craft_quantity.get(item, 1))
         per_component_options = []
         for comp, qty in db.recipes[item]:
             comp_reps = enumerate_representations(
-                db, comp, reverse_index, expandable_nodes, allowed_container_sources, cache
+                db,
+                comp,
+                qty * batches,
+                reverse_index,
+                expandable_nodes,
+                allowed_container_sources,
+                cache,
             )
-            scaled = [{k: v * qty for k, v in rep.items()} for rep in comp_reps]
-            per_component_options.append(scaled)
+            per_component_options.append(comp_reps)
 
         for combo in product(*per_component_options):
             merged = {}
@@ -97,21 +110,22 @@ def enumerate_representations(
             seen.add(key)
             unique.append(rep)
 
-    cache[item] = unique
+    cache[cache_key] = unique
     return unique
 
 
-def fully_expanded_raw(db, item, multiplier=1, acc=None):
+def fully_expanded_raw(db, item, quantity=1, acc=None):
     """The single deterministic "no optimisation" representation: every
     craftable node expanded all the way down to true raw materials, with
-    no container substitution. Returns {raw_item_id: qty_per_unit_of_root}."""
+    no container substitution. Returns concrete required quantities."""
     if acc is None:
         acc = {}
     if item in db.recipes:
+        batches = ceil(quantity / db.craft_quantity.get(item, 1))
         for comp, qty in db.recipes[item]:
-            fully_expanded_raw(db, comp, multiplier * qty, acc)
+            fully_expanded_raw(db, comp, batches * qty, acc)
     else:
-        acc[item] = acc.get(item, 0) + multiplier
+        acc[item] = acc.get(item, 0) + quantity
     return acc
 
 

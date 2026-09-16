@@ -31,6 +31,27 @@ class CraftingTests(unittest.TestCase):
         plan = crafting_plan(db, 'target', 10, {'part': 6, 'rope': 10}, {('target', 'part'): 'find'})
         self.assertEqual({'part': 14}, plan['shopping'])
 
+    def test_recipe_batch_output_is_respected(self):
+        db = Database()
+        db.add_raw('chemicals', 50)
+        db.add_raw('metal_parts', 50)
+        db.add_recipe(
+            'medium_ammo', 80,
+            [('chemicals', 2), ('metal_parts', 3)],
+            craft_quantity=20,
+        )
+
+        one_batch = crafting_plan(db, 'medium_ammo', 20)
+        self.assertEqual({'chemicals': 2, 'metal_parts': 3}, one_batch['shopping'])
+        self.assertEqual(
+            [{'item': 'medium_ammo', 'count': 20}],
+            one_batch['steps'],
+        )
+
+        two_batches = crafting_plan(db, 'medium_ammo', 21)
+        self.assertEqual({'chemicals': 4, 'metal_parts': 6}, two_batches['shopping'])
+        self.assertEqual(40, two_batches['root']['produced'])
+
     def test_shared_inventory_is_not_credited_twice(self):
         db = Database()
         db.add_recipe('target', 1, [('a', 1), ('b', 1)])
